@@ -212,6 +212,15 @@ object ImageSet {
   }
 
   /**
+   *transform rdds read into DStreams
+  */
+  def streamread(imageSet: ImageSet, minPartitions: Int = 1,
+           resizeH: Int = -1, resizeW: Int = -1,
+           imageCodec: Int = Imgcodecs.CV_LOAD_IMAGE_UNCHANGED): ImageSet = {
+    transform(imageSet, resizeH, resizeW, imageCodec)
+  }
+
+  /**
    * Convert ImageFrame to ImageSet
    *
    * @param imageFrame imageFrame which needs to covert to Imageset
