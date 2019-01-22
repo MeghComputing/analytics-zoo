@@ -60,7 +60,7 @@ class StreamPredict(module: String = "",
                      batchDuration: Int = 500
 ) extends Serializable { 
   
-   @transient lazy val logger = Logger.getLogger("meghlogger")
+   @transient lazy val logger = Logger.getLogger(getClass)
 
   def bytesToImageObjects(is: InputStream) : Iterator[ImageFeature] = {
       val dis = new DataInputStream(is)  
