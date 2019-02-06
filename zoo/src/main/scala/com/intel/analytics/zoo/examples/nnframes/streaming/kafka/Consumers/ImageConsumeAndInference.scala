@@ -257,7 +257,7 @@ class ImageConsumeAndInference(module: String = "",
     val kafkaConf = Map[String, Object](
       ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> KAFKA_BROKERS,
       ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
-      ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG -> classOf[PayloadDeserializer],
+      ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG -> classOf[ImageFeatureDeserializer],
       ConsumerConfig.MAX_POLL_RECORDS_CONFIG -> MAX_POLL_RECORDS,
       ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> "false",
       ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> OFFSET_RESET_EARLIER,
