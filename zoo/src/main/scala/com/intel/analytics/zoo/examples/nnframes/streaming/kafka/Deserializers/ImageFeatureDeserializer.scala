@@ -12,7 +12,7 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.util.Map;
 
-class PayloadDeserializer extends org.apache.kafka.common.serialization.Deserializer[Object] {
+class ImageFeatureDeserializer extends org.apache.kafka.common.serialization.Deserializer[Object] {
   
   override def configure(configs : Map[String, _], isKey: Boolean): Unit = {
     
