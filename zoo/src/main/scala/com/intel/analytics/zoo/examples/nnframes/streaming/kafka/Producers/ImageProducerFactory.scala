@@ -1,0 +1,28 @@
+package com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Producers
+
+import java.util.Properties
+import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Serializers._
+
+import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
+
+import org.apache.kafka.common.serialization.StringSerializer
+
+
+object ImageProducerFactory {
+  
+  val KAFKA_BROKERS = "222.10.0.50:9092"
+  val CLIENT_ID = "client1"
+  
+  def createProducer : KafkaProducer[String, ImageFeature] = {
+    var prop = new Properties()
+    prop.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BROKERS)
+    prop.put(ProducerConfig.CLIENT_ID_CONFIG, CLIENT_ID)
+    prop.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[StringSerializer])
+    prop.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, classOf[ImageFeatureSerializer])
+    
+    return new KafkaProducer[String, ImageFeature](prop);
+  }
+  
+}

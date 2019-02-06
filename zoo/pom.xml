@@ -26,6 +26,7 @@
         <spark.version>2.3.1</spark.version>
         <bigdl.version>0.7.2</bigdl.version>
         <data-store-url>https://s3-ap-southeast-1.amazonaws.com</data-store-url>
+        <kafka.version>2.1.0</kafka.version>
     </properties>
 
     <distributionManagement>
@@ -234,6 +235,16 @@
             <artifactId>spark-mllib_${scala.major.version}</artifactId>
             <version>${spark.version}</version>
             <scope>${spark-scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>${kafka.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-streaming-kafka-0-10_2.11</artifactId>
+            <version>${spark.version}</version>
         </dependency>
         <dependency>
             <groupId>com.intel.analytics.bigdl</groupId>
