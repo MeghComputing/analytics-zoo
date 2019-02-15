@@ -12,7 +12,7 @@ import org.apache.kafka.common.serialization.StringSerializer
 
 object ImageProducerFactory {
   
-  val KAFKA_BROKERS = "222.10.0.50:9092"
+  val KAFKA_BROKERS = "222.10.0.51:9092"
   val CLIENT_ID = "client1"
   
   def createProducer : KafkaProducer[String, ImageFeature] = {
@@ -20,7 +20,7 @@ object ImageProducerFactory {
     prop.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BROKERS)
     prop.put(ProducerConfig.CLIENT_ID_CONFIG, CLIENT_ID)
     prop.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[StringSerializer])
-    prop.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, classOf[ImageFeatureSerializer])
+    prop.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, classOf[CustomObjectSerializer])
     
     return new KafkaProducer[String, ImageFeature](prop);
   }

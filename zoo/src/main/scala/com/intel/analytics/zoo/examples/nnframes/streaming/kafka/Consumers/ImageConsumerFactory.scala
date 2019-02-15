@@ -14,7 +14,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 
 object ImageConsumerFactory {
   
-  val KAFKA_BROKERS = "222.10.0.50:9092"
+  val KAFKA_BROKERS = "222.10.0.51:9092"
   val GROUP_ID = "consumerGroup1"
   val TOPIC: String = "imagestream1"
   val MAX_POLL_RECORDS: Integer = 1
@@ -25,7 +25,7 @@ object ImageConsumerFactory {
     prop.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BROKERS)
     prop.put(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID)
     prop.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[StringDeserializer])
-    prop.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ImageFeatureDeserializer])
+    prop.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[CustomObjectDeserializer])
     prop.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, MAX_POLL_RECORDS)
     prop.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
     prop.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, OFFSET_RESET_EARLIER)
