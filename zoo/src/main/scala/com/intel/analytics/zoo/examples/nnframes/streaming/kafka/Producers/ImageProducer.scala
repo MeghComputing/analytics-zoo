@@ -2,6 +2,8 @@ package com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Producers
 
 import java.io.{ByteArrayOutputStream, File}
 
+import java.util.UUID
+
 import util.control.Breaks._
 
 import java.nio.file.Files
@@ -25,10 +27,10 @@ object ImageProducer {
     
     val producer = ImageProducerFactory.createProducer
     
-    if(!Files.notExists(Paths.get(args(0))))
+    /*if(!Files.notExists(Paths.get(args(0))))
     {
       throw new IllegalArgumentException("check command line arguments")
-    }
+    }*/
     
     val dir = new File(args(0)).listFiles
     var count = 0
@@ -55,7 +57,7 @@ object ImageProducer {
           
           val imgFeature = new ImageFeature(data, uri = imageName)
           
-          val record: ProducerRecord[String, ImageFeature] = new ProducerRecord(TOPIC, imgFeature)
+          val record: ProducerRecord[String, ImageFeature] = new ProducerRecord(TOPIC, UUID.randomUUID.toString, imgFeature)
           producer.send(record)
           
           count = count + 1

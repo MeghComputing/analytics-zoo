@@ -1,25 +1,20 @@
-package com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Consumers
+package com.intel.analytics.zoo.examples.imageclassification
 
+import com.intel.analytics.bigdl.Module
 import com.intel.analytics.bigdl.nn.Module
-import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric.NumericFloat
-import com.intel.analytics.bigdl.utils.LoggerFilter
-import com.intel.analytics.zoo.pipeline.nnframes._
 import com.intel.analytics.zoo.common.NNContext
 import com.intel.analytics.zoo.feature.image._
+import com.intel.analytics.zoo.pipeline.inference.InferenceModel
+import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric.NumericFloat
+import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
+import com.intel.analytics.zoo.feature.common.Preprocessing
+import org.apache.spark.SparkContext
+
+import com.intel.analytics.bigdl.utils.LoggerFilter
+import com.intel.analytics.zoo.pipeline.nnframes._
 import com.intel.analytics.zoo.feature.image.ImageSet
 import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
 import com.intel.analytics.zoo.models.image.imageclassification.{ImageClassifier, LabelOutput}
-import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Deserializers._
-
-import org.apache.spark.streaming.dstream.InputDStream
-import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
-import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
-import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
-import org.apache.spark.streaming.kafka010.{CanCommitOffsets, HasOffsetRanges, KafkaUtils}
-import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions._
@@ -30,14 +25,12 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.Duration
 import org.apache.spark.streaming.dstream.SocketInputDStream
-//import org.apache.spark.streaming
 
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.api.java.function.Function
 import org.apache.spark.util.NextIterator
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
 
 import org.apache.commons.io.FileUtils
 
@@ -54,9 +47,8 @@ import java.nio.ByteOrder
 
 import java.awt.image.BufferedImage
 
-import java.util.UUID
-
 import scopt.OptionParser
+
 
 import scala.tools.jline_embedded.internal.InputStreamReader
 import scala.reflect.io.Streamable.Bytes
@@ -65,17 +57,16 @@ import org.apache.log4j.{Level, Logger}
 
 import org.opencv.core.{CvType, Mat}
 import org.opencv.imgcodecs.Imgcodecs
-import org.apache.spark.SparkConf
-import java.security.Key
 
-
-class ImageConsumeAndInference(module: String = "",
+class StreamTunedImgClassify(module: String = "",
                      host: String = "",
                      port: Int = 9990,
                      nPartition: Int = 1,
                      batchSize: Int = 4,
-                     batchDuration: Int = 500
-) extends Serializable {
+                     batchDuration: Int = 500,
+                     mode: String = "local"
+) extends Serializable { 
+  
   @transient lazy val logger = Logger.getLogger("meghlogger")
   @transient var sc: SparkContext = _
 
@@ -132,7 +123,8 @@ class ImageConsumeAndInference(module: String = "",
     	         val data = new Array[Byte](len);
     	         dis.readFully(data, 0, len);
     	         
-    	         try{    	             
+    	         try{
+    	             
     	             nextValue = ImageFeature(data, uri = imageName)    
                    if (nextValue.bytes() == null) {
                        logger.info("Next value empty!!");
@@ -150,12 +142,13 @@ class ImageConsumeAndInference(module: String = "",
                
                //logger.info("Next value fine");
              }
-             catch {               
+             catch {
+               
                case e: Exception => e.printStackTrace(new PrintWriter(sw))
                finished = true;
                logger.error(sw.toString())
              }
-          //logger.info("End get next");
+          //ogger.info("End get next");
           gotNext = true
         }  
       
@@ -165,12 +158,12 @@ class ImageConsumeAndInference(module: String = "",
             if (!gotNext) {
               getNext()
               if (finished) {
-                finished = true;
+                finished = true
                 dis.close()
               }
             }
           }
-          //gger.info("End hasNext");
+          //logger.info("End hasNext");
           !finished
         }
       
@@ -189,116 +182,89 @@ class ImageConsumeAndInference(module: String = "",
       
       new ImageIterator
   }
-  
+   
   def doClassify(rdd : RDD[ImageFeature]) : Unit =  {
       logger.info(s"Start classification")
-      val notNullRDDs = rdd.filter(f => (f != null && f.bytes() != null ))
-      val count = notNullRDDs.count()
+      val count = rdd.count()
       logger.info("RDD Count:" + count)
       if(count > 0)
       {
         logger.info(s"Non-Empty RDD start processing")
-        //val data = ImageSet.rdd(rdd.coalesce(nPartition, true))    
-        
-        
-        val getImageName = udf { row: Row => row.getString(0)}        
-        val data = ImageSet.rdd(notNullRDDs)
-        val mappedData = ImageSet.streamread(data, minPartitions = nPartition,
-                          resizeH = 256, resizeW = 256, imageCodec = 1)
-        val rowRDD = mappedData.toDistributed().rdd.map { imf => Row(NNImageSchema.imf2Row(imf))}
-        val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowRDD, imageColumnSchema)
-                    .repartition(nPartition)
-                    .withColumn("imageName", getImageName(col("image")))
-                    
-        logger.info("#partitions: " + imageDF.rdd.partitions.length)
-        logger.info("master: " + sc.master) 
-        imageDF.cache().collect()
-
-        val transformer = RowToImageFeature() -> ImageCenterCrop(224, 224) ->
-        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
-
-        val model = Module.loadModule[Float](module)
-        val dlmodel = NNClassifierModel(model, transformer)
-                      .setBatchSize(batchSize)
-                      .setFeaturesCol("image")
-                      .setPredictionCol("prediction")
-
+        val transformer = ImageResize(256, 256) -> ImageCenterCrop(224, 224) ->
+          ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageSetToSample()
+          
+        val model = Module.loadModule(module).evaluate()
         val st = System.nanoTime()
-        val resultDF = dlmodel.transform(imageDF)
-        resultDF.collect()
-        val time = (System.nanoTime() - st)/1e9
-        logger.info("inference finished in " + time)
-        logger.info("throughput: " + imageDF.count() / time)
-
-        resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
+        if (mode == "local") {
+          localInference(rdd, model, transformer)      
+        } else {    
+          distributedInference(rdd, model, transformer, sc) 
+        }       
+        val inferTime = (System.nanoTime() - st) / 1e9
+        logger.info("inference finished in " + inferTime)
+        logger.info("throughput: " + rdd.count() / inferTime)
       }
   }
   
-  private val imageColumnSchema =
-    StructType(StructField("image", NNImageSchema.byteSchema, true) :: Nil)
-    
-  private val KAFKA_BROKERS = "222.10.0.51:9092"
-  private val GROUP_ID = "consumerGroup1"
-  private val TOPIC = Array("imagestream1")
-  private val MAX_POLL_RECORDS: Integer = 1
-  private val OFFSET_RESET_EARLIER = "earliest"
 
   def stream() = {
     logger.setLevel(Level.ALL)
-    
-    val conf = new SparkConf().set("spark.streaming.receiver.maxRate", "50")
-                  .set("spark.streaming.kafka.maxRatePerPartition", "50")
-                  .set("spark.shuffle.reduceLocality.enabled", "false")
-                  .set("spark.shuffle.blockTransferService", "nio")
-                  .set("spark.scheduler.minRegisteredResourcesRatio", "1.0")
-                  .set("spark.speculation", "true")
-                  .setAppName("Image Streaming")
-                  
-    val kafkaConf = Map[String, Object](
-      ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> KAFKA_BROKERS,
-      ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
-      ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG -> classOf[CustomObjectDeserializer],
-      ConsumerConfig.MAX_POLL_RECORDS_CONFIG -> MAX_POLL_RECORDS,
-      ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> "false",
-      ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> OFFSET_RESET_EARLIER,
-      ConsumerConfig.GROUP_ID_CONFIG ->  GROUP_ID
-    )
-    
-    sc = NNContext.initNNContext(conf)              
-          
+    sc = NNContext.initNNContext("ImageInference")
+      
     val ssc = new StreamingContext(sc, new Duration(batchDuration))
+    //ssc.remember(new Duration(60000));
     
-    val stream: InputDStream[ConsumerRecord[String, ImageFeature]] =  KafkaUtils.createDirectStream[String, ImageFeature](
-      ssc
-      , PreferConsistent
-      , Subscribe[String, ImageFeature](Array("imagestream1"), kafkaConf)
-    )
+    logger.info(s"Load model and start socket stream")    
+        
+    var imageDStream = ssc.socketStream(host, port, bytesToImageObjects, StorageLevel.MEMORY_AND_DISK_SER)
     
-    logger.info(s"Load model and start socket stream")
-    
-    val model = ImageClassifier.loadModel[Float](module)      
-    
-    stream.foreachRDD((kafkaRDD: RDD[ConsumerRecord[String, ImageFeature]], t) => {
-      val kafkaRDDCount = kafkaRDD.count()
-
-      println("Kafka RDD Count: " + kafkaRDD.count())
-
-      if(kafkaRDDCount > 0)
-      {
-        var topic = kafkaRDD.map(row => row.key())
-        println("Topic read from: " + topic.first())
-        var rdd = kafkaRDD.map(row => row.value())
-        println("Extracted RDD Count: " + rdd.count())
-        doClassify(rdd)
-      }
-    })
+    imageDStream.foreachRDD(rdd => doClassify(rdd))
     
     ssc.start()  
     ssc.awaitTermination();
-   }
-}
+  }
+  
+  /**
+   * read images from local file system and run inference locally without sparkcontext
+   * master = local[x]
+   * only support local file system
+   */
+  def localInference(
+      rdd : RDD[ImageFeature],
+      model: Module[Float],
+      transformer: Preprocessing[ImageFeature, ImageFeature]): Unit = {
+    
+    val data = ImageSet.array(rdd.collect())
+    val images = ImageSet.streamread(data)
+    val features = images.transform(transformer)
+    val result = model.predictImage(features.toImageFrame(), batchPerPartition = 8)
+    val output = result.toLocal().array.head.predict()
+    
+  }
 
-object ImageConsumeAndInference{
+  /**
+   * run inference in cluster mode, with spark overhead.
+   * use master = local[x] or yarn
+   * support HDFS path
+   */
+  def distributedInference(
+      rdd : RDD[ImageFeature],
+      model: Module[Float],
+      transformer: Preprocessing[ImageFeature, ImageFeature],
+      sc: SparkContext): Unit = {
+    
+    val data = ImageSet.rdd(rdd)
+    val images = ImageSet.streamread(data)
+    println("#number of partitions: " + images.toDistributed().rdd.partitions.length)
+    val features = images.transform(transformer)
+    val result = model.predictImage(features.toImageFrame(), batchPerPartition = 8)
+    val output = result.toDistributed().rdd.collect().head.predict()
+    
+  }
+
+}  
+
+object StreamTunedImgClassify{
   Logger.getLogger("org").setLevel(Level.ERROR)
   Logger.getLogger("akka").setLevel(Level.ERROR)
   Logger.getLogger("breeze").setLevel(Level.ERROR)
@@ -311,7 +277,8 @@ object ImageConsumeAndInference{
                                      port: Int = 9990,
                                      nPartition: Int = 1,
                                      batchSize: Int = 4,
-                                     batchDuration: Int = 500)
+                                     batchDuration: Int = 500,                                     
+                                     mode: String = "local")
 
   val parser = new OptionParser[TopNClassificationParam]("ImageClassification demo") {
     head("Analytics Zoo ImageClassification demo")
@@ -340,16 +307,23 @@ object ImageConsumeAndInference{
       .text("batch duration")
       .action((x, c) => c.copy(batchDuration = x))
       .required()
+    opt[String]("mode")
+      .text("cluster mode")
+      .action((x, c) => c.copy(mode = x))
+      .required()
   }   
 
   def main(args: Array[String]): Unit = {
       parser.parse(args, TopNClassificationParam()).foreach { params =>
-      var sparkDriver = new ImageConsumeAndInference(params.model,
+      require(Seq("local", "distributed").contains(params.mode))
+      
+      var sparkDriver = new StreamTunedImgClassify(params.model,
   				        params.host,
   				        params.port,
   				        params.nPartition,
   				        params.batchSize,
-  				        params.batchDuration) 
+  				        params.batchDuration,
+  				        params.mode) 
       sparkDriver.stream()
     }
   }
