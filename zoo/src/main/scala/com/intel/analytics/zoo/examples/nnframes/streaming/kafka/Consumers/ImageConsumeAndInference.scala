@@ -67,15 +67,12 @@ import org.opencv.core.{CvType, Mat}
 import org.opencv.imgcodecs.Imgcodecs
 import org.apache.spark.SparkConf
 import java.security.Key
+import scala.util.Properties
+import java.util.Properties
+import java.io.FileInputStream
 
 
-class ImageConsumeAndInference(module: String = "",
-                     host: String = "",
-                     port: Int = 9990,
-                     nPartition: Int = 1,
-                     batchSize: Int = 4,
-                     batchDuration: Int = 500
-) extends Serializable {
+class ImageConsumeAndInference(prop: Properties) extends Serializable {
   @transient lazy val logger = Logger.getLogger("meghlogger")
   @transient var sc: SparkContext = _
 
@@ -203,11 +200,11 @@ class ImageConsumeAndInference(module: String = "",
         
         val getImageName = udf { row: Row => row.getString(0)}        
         val data = ImageSet.rdd(notNullRDDs)
-        val mappedData = ImageSet.streamread(data, minPartitions = nPartition,
+        val mappedData = ImageSet.streamread(data, minPartitions = prop.getProperty("rdd.partition").toInt,
                           resizeH = 256, resizeW = 256, imageCodec = 1)
         val rowRDD = mappedData.toDistributed().rdd.map { imf => Row(NNImageSchema.imf2Row(imf))}
         val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowRDD, imageColumnSchema)
-                    .repartition(nPartition)
+                    .repartition(prop.getProperty("rdd.partition").toInt)
                     .withColumn("imageName", getImageName(col("image")))
                     
         logger.info("#partitions: " + imageDF.rdd.partitions.length)
@@ -217,9 +214,9 @@ class ImageConsumeAndInference(module: String = "",
         val transformer = RowToImageFeature() -> ImageCenterCrop(224, 224) ->
         ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
 
-        val model = Module.loadModule[Float](module)
+        val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
         val dlmodel = NNClassifierModel(model, transformer)
-                      .setBatchSize(batchSize)
+                      .setBatchSize(prop.getProperty("inference.batchsize").toInt)
                       .setFeaturesCol("image")
                       .setPredictionCol("prediction")
 
@@ -237,46 +234,40 @@ class ImageConsumeAndInference(module: String = "",
   private val imageColumnSchema =
     StructType(StructField("image", NNImageSchema.byteSchema, true) :: Nil)
     
-  private val KAFKA_BROKERS = "222.10.0.51:9092"
-  private val GROUP_ID = "consumerGroup1"
-  private val TOPIC = Array("imagestream1")
-  private val MAX_POLL_RECORDS: Integer = 1
-  private val OFFSET_RESET_EARLIER = "earliest"
+  private val TOPIC = Array(prop.getProperty("kafka.topic"))
 
   def stream() = {
     logger.setLevel(Level.ALL)
     
-    val conf = new SparkConf().set("spark.streaming.receiver.maxRate", "50")
-                  .set("spark.streaming.kafka.maxRatePerPartition", "50")
-                  .set("spark.shuffle.reduceLocality.enabled", "false")
-                  .set("spark.shuffle.blockTransferService", "nio")
-                  .set("spark.scheduler.minRegisteredResourcesRatio", "1.0")
-                  .set("spark.speculation", "true")
-                  .setAppName("Image Streaming")
+    val conf = new SparkConf().set("spark.streaming.receiver.maxRate", prop.getProperty("spark.streaming.receiver.maxRate"))
+                  .set("spark.streaming.kafka.maxRatePerPartition", prop.getProperty("spark.streaming.kafka.maxRatePerPartition"))
+                  .set("spark.shuffle.reduceLocality.enabled", prop.getProperty("spark.shuffle.reduceLocality.enabled"))
+                  .set("spark.shuffle.blockTransferService", prop.getProperty("spark.shuffle.blockTransferService"))
+                  .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
+                  .set("spark.speculation", prop.getProperty("spark.speculation"))
+                  .setAppName(prop.getProperty("spark.app.name"))
                   
     val kafkaConf = Map[String, Object](
-      ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> KAFKA_BROKERS,
+      ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> prop.getProperty("bootstrap.servers"),
       ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
       ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG -> classOf[CustomObjectDeserializer],
-      ConsumerConfig.MAX_POLL_RECORDS_CONFIG -> MAX_POLL_RECORDS,
-      ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> "false",
-      ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> OFFSET_RESET_EARLIER,
-      ConsumerConfig.GROUP_ID_CONFIG ->  GROUP_ID
+      ConsumerConfig.MAX_POLL_RECORDS_CONFIG -> prop.getProperty("max.poll.records"),
+      ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> prop.getProperty("enable.auto.commit.config"),
+      ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> prop.getProperty("auto.offset.reset"),
+      ConsumerConfig.GROUP_ID_CONFIG ->  prop.getProperty("group.id")
     )
     
     sc = NNContext.initNNContext(conf)              
           
-    val ssc = new StreamingContext(sc, new Duration(batchDuration))
+    val ssc = new StreamingContext(sc, new Duration(prop.getProperty("streaming.batch.duration").toInt))
     
     val stream: InputDStream[ConsumerRecord[String, ImageFeature]] =  KafkaUtils.createDirectStream[String, ImageFeature](
       ssc
       , PreferConsistent
-      , Subscribe[String, ImageFeature](Array("imagestream1"), kafkaConf)
+      , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
     )
     
-    logger.info(s"Load model and start socket stream")
-    
-    val model = ImageClassifier.loadModel[Float](module)      
+    logger.info(s"Load model and start socket stream")    
     
     stream.foreachRDD((kafkaRDD: RDD[ConsumerRecord[String, ImageFeature]], t) => {
       val kafkaRDDCount = kafkaRDD.count()
@@ -306,50 +297,29 @@ object ImageConsumeAndInference{
 
   val logger = Logger.getLogger(getClass)
 
-  case class TopNClassificationParam(model: String = "",
-                                     host: String = "",
-                                     port: Int = 9990,
-                                     nPartition: Int = 1,
-                                     batchSize: Int = 4,
-                                     batchDuration: Int = 500)
+  case class TopNClassificationParam(propFile: String= "")
 
   val parser = new OptionParser[TopNClassificationParam]("ImageClassification demo") {
     head("Analytics Zoo ImageClassification demo")
    
-    opt[String]("host")
-      .text("host ip to connect to")
-      .action((x, c) => c.copy(host = x))
-      .required()      
-    opt[Int]("port")
-      .text("port to connect to")
-      .action((x, c) => c.copy(port = x))
-      .required()
-    opt[String]("model")
-      .text("Analytics Zoo model")
-      .action((x, c) => c.copy(model = x))
-      .required()
-    opt[Int]('p', "partition")
-      .text("number of partitions")
-      .action((x, c) => c.copy(nPartition = x))
-      .required()
-    opt[Int]('b', "batchSize")
-      .text("batch size")
-      .action((x, c) => c.copy(batchSize = x))
-      .required()
-    opt[Int]('b', "batchDuration")
-      .text("batch duration")
-      .action((x, c) => c.copy(batchDuration = x))
-      .required()
+    opt[String]("propFile")
+      .text("properties files")
+      .action((x, c) => c.copy(propFile = x))
+      .required() 
   }   
 
   def main(args: Array[String]): Unit = {
-      parser.parse(args, TopNClassificationParam()).foreach { params =>
-      var sparkDriver = new ImageConsumeAndInference(params.model,
-  				        params.host,
-  				        params.port,
-  				        params.nPartition,
-  				        params.batchSize,
-  				        params.batchDuration) 
+    parser.parse(args, TopNClassificationParam()).foreach { params =>
+      val prop = new Properties()
+      
+      try {        
+        prop.load(new FileInputStream(params.propFile))
+      } catch { case e: Exception => 
+        e.printStackTrace()
+        sys.exit(1)
+      }
+        
+      val sparkDriver = new ImageConsumeAndInference(prop) 
       sparkDriver.stream()
     }
   }
