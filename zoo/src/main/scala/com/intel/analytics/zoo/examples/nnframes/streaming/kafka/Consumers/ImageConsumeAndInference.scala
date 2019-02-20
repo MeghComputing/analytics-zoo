@@ -188,47 +188,47 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
   }
   
   def doClassify(rdd : RDD[ImageFeature]) : Unit =  {
-      logger.info(s"Start classification")
-      val notNullRDDs = rdd.filter(f => (f != null && f.bytes() != null ))
-      val count = notNullRDDs.count()
-      logger.info("RDD Count:" + count)
-      if(count > 0)
-      {
-        logger.info(s"Non-Empty RDD start processing")
-        //val data = ImageSet.rdd(rdd.coalesce(nPartition, true))    
-        
-        
-        val getImageName = udf { row: Row => row.getString(0)}        
-        val data = ImageSet.rdd(notNullRDDs)
-        val mappedData = ImageSet.streamread(data, minPartitions = prop.getProperty("rdd.partition").toInt,
-                          resizeH = 256, resizeW = 256, imageCodec = 1)
-        val rowRDD = mappedData.toDistributed().rdd.map { imf => Row(NNImageSchema.imf2Row(imf))}
-        val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowRDD, imageColumnSchema)
-                    .repartition(prop.getProperty("rdd.partition").toInt)
-                    .withColumn("imageName", getImageName(col("image")))
-                    
-        logger.info("#partitions: " + imageDF.rdd.partitions.length)
-        logger.info("master: " + sc.master) 
-        imageDF.cache().collect()
+    logger.info(s"Start classification")
+    val notNullRDDs = rdd.filter(f => (f != null && f.bytes() != null ))
+    val count = notNullRDDs.count()
+    logger.info("RDD Count:" + count)
+    if(count > 0)
+    {
+      logger.info(s"Non-Empty RDD start processing")
+      //val data = ImageSet.rdd(rdd.coalesce(nPartition, true))    
+      
+      
+      val getImageName = udf { row: Row => row.getString(0)}        
+      val data = ImageSet.rdd(notNullRDDs)
+      val mappedData = ImageSet.streamread(data, minPartitions = prop.getProperty("rdd.partition").toInt,
+                        resizeH = 256, resizeW = 256, imageCodec = 1)
+      val rowRDD = mappedData.toDistributed().rdd.map { imf => Row(NNImageSchema.imf2Row(imf))}
+      val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowRDD, imageColumnSchema)
+                  .repartition(prop.getProperty("rdd.partition").toInt)
+                  .withColumn("imageName", getImageName(col("image")))
+                  
+      logger.info("#partitions: " + imageDF.rdd.partitions.length)
+      logger.info("master: " + sc.master) 
+      //imageDF.cache().collect()
 
-        val transformer = RowToImageFeature() -> ImageCenterCrop(224, 224) ->
-        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
+      val transformer = RowToImageFeature() -> ImageCenterCrop(224, 224) ->
+      ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
 
-        val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
-        val dlmodel = NNClassifierModel(model, transformer)
-                      .setBatchSize(prop.getProperty("inference.batchsize").toInt)
-                      .setFeaturesCol("image")
-                      .setPredictionCol("prediction")
+      val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
+      val dlmodel = NNClassifierModel(model, transformer)
+                    .setBatchSize(prop.getProperty("inference.batchsize").toInt)
+                    .setFeaturesCol("image")
+                    .setPredictionCol("prediction")
 
-        val st = System.nanoTime()
-        val resultDF = dlmodel.transform(imageDF)
-        resultDF.collect()
-        val time = (System.nanoTime() - st)/1e9
-        logger.info("inference finished in " + time)
-        logger.info("throughput: " + imageDF.count() / time)
+      val st = System.nanoTime()
+      val resultDF = dlmodel.transform(imageDF)
+      resultDF.collect()
+      val time = (System.nanoTime() - st)/1e9
+      logger.info("inference finished in " + time)
+      logger.info("throughput: " + count / time)
 
-        resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
-      }
+      //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
+    }
   }
   
   private val imageColumnSchema =
@@ -237,16 +237,16 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
   private val TOPIC = Array(prop.getProperty("kafka.topic"))
 
   def stream() = {
-    logger.setLevel(Level.ALL)
     
+  
     val conf = new SparkConf().set("spark.streaming.receiver.maxRate", prop.getProperty("spark.streaming.receiver.maxRate"))
-                  .set("spark.streaming.kafka.maxRatePerPartition", prop.getProperty("spark.streaming.kafka.maxRatePerPartition"))
-                  .set("spark.shuffle.reduceLocality.enabled", prop.getProperty("spark.shuffle.reduceLocality.enabled"))
-                  .set("spark.shuffle.blockTransferService", prop.getProperty("spark.shuffle.blockTransferService"))
-                  .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
-                  .set("spark.speculation", prop.getProperty("spark.speculation"))
-                  .setAppName(prop.getProperty("spark.app.name"))
-                  
+                            .set("spark.streaming.kafka.maxRatePerPartition", prop.getProperty("spark.streaming.kafka.maxRatePerPartition"))
+                            .set("spark.shuffle.reduceLocality.enabled", prop.getProperty("spark.shuffle.reduceLocality.enabled"))
+                            .set("spark.shuffle.blockTransferService", prop.getProperty("spark.shuffle.blockTransferService"))
+                            .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
+                            .set("spark.speculation", prop.getProperty("spark.speculation"))
+                            .setAppName(prop.getProperty("spark.app.name"))
+                
     val kafkaConf = Map[String, Object](
       ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> prop.getProperty("bootstrap.servers"),
       ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
@@ -256,9 +256,9 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
       ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> prop.getProperty("auto.offset.reset"),
       ConsumerConfig.GROUP_ID_CONFIG ->  prop.getProperty("group.id")
     )
-    
+  
     sc = NNContext.initNNContext(conf)              
-          
+        
     val ssc = new StreamingContext(sc, new Duration(prop.getProperty("streaming.batch.duration").toInt))
     
     val stream: InputDStream[ConsumerRecord[String, ImageFeature]] =  KafkaUtils.createDirectStream[String, ImageFeature](
@@ -270,18 +270,8 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
     logger.info(s"Load model and start socket stream")    
     
     stream.foreachRDD((kafkaRDD: RDD[ConsumerRecord[String, ImageFeature]], t) => {
-      val kafkaRDDCount = kafkaRDD.count()
-
-      println("Kafka RDD Count: " + kafkaRDD.count())
-
-      if(kafkaRDDCount > 0)
-      {
-        var topic = kafkaRDD.map(row => row.key())
-        println("Topic read from: " + topic.first())
-        var rdd = kafkaRDD.map(row => row.value())
-        println("Extracted RDD Count: " + rdd.count())
-        doClassify(rdd)
-      }
+      val rdd = kafkaRDD.map(row => row.value()) 
+      doClassify(rdd)
     })
     
     ssc.start()  
@@ -290,10 +280,11 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
 }
 
 object ImageConsumeAndInference{
-  Logger.getLogger("org").setLevel(Level.ERROR)
-  Logger.getLogger("akka").setLevel(Level.ERROR)
-  Logger.getLogger("breeze").setLevel(Level.ERROR)
-  Logger.getLogger("com.intel.analytics.zoo").setLevel(Level.INFO)
+  //Logger.getLogger("org").setLevel(Level.ERROR)
+  //Logger.getLogger("akka").setLevel(Level.ERROR)
+  //Logger.getLogger("breeze").setLevel(Level.ERROR)
+  //Logger.getLogger("com.intel.analytics.zoo").setLevel(Level.INFO)
+  logger.setLevel(Level.ALL)
 
   val logger = Logger.getLogger(getClass)
 

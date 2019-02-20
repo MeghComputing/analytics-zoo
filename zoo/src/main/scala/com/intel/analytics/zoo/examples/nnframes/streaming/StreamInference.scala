@@ -183,9 +183,7 @@ class StreamInference(
 
   def doClassify(rdd: RDD[ImageFeature]): Unit = {
     logger.info(s"Start classification")
-    val count = rdd.count()
-    logger.info("RDD Count:" + count)
-    if (count > 0) {
+    if (rdd.take(1).length > 0) {
       logger.info(s"Non-Empty RDD start processing")
       //val data = ImageSet.rdd(rdd.coalesce(nPartition, true))
 
@@ -207,7 +205,7 @@ class StreamInference(
       }       
       val inferTime = (System.nanoTime() - st) / 1e9
       logger.info("inference finished in " + inferTime)
-      logger.info("throughput: " + count / inferTime)
+      logger.info("throughput: " + rdd.count() / inferTime)
       //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
     }
   }
@@ -233,11 +231,11 @@ class StreamInference(
     val rowData = mappedData.toLocal().array.map { imf => Row(NNImageSchema.imf2Row(imf)) }.toList   
     val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowData.asJava, imageColumnSchema)
                 .withColumn("imageName", getImageName(col("image")))
-    imageDF.cache().collect()
+    //imageDF.cache().collect()
                 
     val resultDF = model.transform(imageDF)
     resultDF.collect()
-    resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
+    //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
   }
 
   /**
@@ -260,16 +258,16 @@ class StreamInference(
     val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowRDD, imageColumnSchema)
                 .repartition(nPartition)
                 .withColumn("imageName", getImageName(col("image")))
-    imageDF.cache().collect()
+    //imageDF.cache().collect()
     
     val resultDF = model.transform(imageDF)
     resultDF.collect()    
-    resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
+    //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
   }
 
   
   def stream() = {
-    logger.setLevel(Level.ALL)
+    //logger.setLevel(Level.ALL)
     sc = NNContext.initNNContext("ImageInference")
 
     val ssc = new StreamingContext(sc, new Duration(batchDuration))
@@ -287,10 +285,11 @@ class StreamInference(
 }
 
 object StreamInference {
-  Logger.getLogger("org").setLevel(Level.ERROR)
-  Logger.getLogger("akka").setLevel(Level.ERROR)
-  Logger.getLogger("breeze").setLevel(Level.ERROR)
-  Logger.getLogger("com.intel.analytics.zoo").setLevel(Level.INFO)
+  //Logger.getLogger("org").setLevel(Level.ERROR)
+  //Logger.getLogger("akka").setLevel(Level.ERROR)
+  //Logger.getLogger("breeze").setLevel(Level.ERROR)
+  //Logger.getLogger("com.intel.analytics.zoo").setLevel(Level.INFO)
+  Logger.getLogger(getClass).setLevel(Level.ALL)
 
   val logger = Logger.getLogger(getClass)
 

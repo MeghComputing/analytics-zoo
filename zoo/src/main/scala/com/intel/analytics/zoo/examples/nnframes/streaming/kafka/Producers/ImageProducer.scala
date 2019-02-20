@@ -68,58 +68,62 @@ object ImageProducer {
     }
     
     parser.parse(args, KafkaProducerParam()).foreach { params =>      
-      val producer = ImageProducerFactory.createProducer(params.brokers, params.clientId)
-      
-      /*if(!Files.notExists(Paths.get(args(0))))
-      {
-        throw new IllegalArgumentException("check command line arguments")
-      }*/
-      
-      val dir = new File(params.imageFolder).listFiles
-      var count = 0
-      
-      if(dir != null) {
-        for(file <- dir) {
-          try {
-            
-            val imageName = file.getName()
-            
-            println("Read from image path:")
-            println(file.getAbsolutePath())
-                  
-            println("Image size:")
-            println(Math.toIntExact(file.length()))
-            
-            val data = FileUtils.readFileToByteArray(file)                 
-            
-            if(data == null)
-            {
-              println("Error reading from file")
-              break
+      while(true) { 
+        
+        val producer = ImageProducerFactory.createProducer(params.brokers, params.clientId)
+        
+        /*if(!Files.notExists(Paths.get(args(0))))
+        {
+          throw new IllegalArgumentException("check command line arguments")
+        }*/
+        
+        val dir = new File(params.imageFolder).listFiles
+        var count = 0
+        
+        if(dir != null) {
+          for(file <- dir) {
+            try {
+              
+              val imageName = file.getName()
+              
+              println("Read from image path:")
+              println(file.getAbsolutePath())
+                    
+              println("Image size:")
+              println(Math.toIntExact(file.length()))
+              
+              val data = FileUtils.readFileToByteArray(file)                 
+              
+              if(data == null)
+              {
+                println("Error reading from file")
+                break
+              }
+              
+              val imgFeature = new ImageFeature(data, uri = imageName)
+              
+              val record: ProducerRecord[String, ImageFeature] = new ProducerRecord(params.topic, UUID.randomUUID.toString, imgFeature)
+              producer.send(record)
+              
+              count = count + 1
+              println("Image successfully sent " + count)
+              
+              Thread.sleep(params.txDelay)
             }
-            
-            val imgFeature = new ImageFeature(data, uri = imageName)
-            
-            val record: ProducerRecord[String, ImageFeature] = new ProducerRecord(params.topic, UUID.randomUUID.toString, imgFeature)
-            producer.send(record)
-            
-            count = count + 1
-            println("Image successfully sent " + count)
-            
-            Thread.sleep(params.txDelay)
+            catch {
+              case e: ExecutionException =>
+                println("Error in sending record")
+                e.printStackTrace()
+              case e: InterruptedException =>
+                println("Error in sending record")
+                e.printStackTrace()
+            }        
           }
-          catch {
-            case e: ExecutionException =>
-              println("Error in sending record")
-              e.printStackTrace()
-            case e: InterruptedException =>
-              println("Error in sending record")
-              e.printStackTrace()
-          }        
         }
-      }
+        
+        producer.close()
       
-      producer.close()
+      }
     }
       
     
