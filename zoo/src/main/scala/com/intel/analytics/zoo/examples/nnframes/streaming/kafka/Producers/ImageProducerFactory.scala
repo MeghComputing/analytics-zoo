@@ -11,7 +11,7 @@ import org.apache.kafka.common.serialization.StringSerializer
 
 
 object ImageProducerFactory {
-  
+
   def createProducer(brokers: String, clientId: String) : KafkaProducer[String, ImageFeature] = {
     var prop = new Properties()
     prop.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers)
