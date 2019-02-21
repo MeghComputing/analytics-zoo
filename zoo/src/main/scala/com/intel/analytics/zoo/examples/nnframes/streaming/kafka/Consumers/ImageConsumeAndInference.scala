@@ -284,9 +284,8 @@ object ImageConsumeAndInference{
   //Logger.getLogger("akka").setLevel(Level.ERROR)
   //Logger.getLogger("breeze").setLevel(Level.ERROR)
   //Logger.getLogger("com.intel.analytics.zoo").setLevel(Level.INFO)
-  logger.setLevel(Level.ALL)
-
   val logger = Logger.getLogger(getClass)
+  logger.setLevel(Level.ALL)
 
   case class TopNClassificationParam(propFile: String= "")
 

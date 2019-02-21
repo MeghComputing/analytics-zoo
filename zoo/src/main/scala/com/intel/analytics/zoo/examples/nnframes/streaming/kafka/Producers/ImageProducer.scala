@@ -14,16 +14,21 @@ import org.apache.commons.io.FileUtils
 
 import scopt.OptionParser
 
+import org.apache.log4j.{Level, Logger}
+
 import scala.actors.threadpool.ExecutionException
 
 import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
 
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
+import org.apache.kafka.common.serialization.StringSerializer
+import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Serializers._
+
 object ImageProducer {
   
   val TOPIC: String = "imagestream1"
-  
+
   case class KafkaProducerParam(brokers: String = "",
                                 clientId: String = "",
                                 imageFolder: String = "",
@@ -60,12 +65,11 @@ object ImageProducer {
   }
   
   def main(args: Array[String]): Unit = {
-    
-    if(args.length < 2)
-    {
-      println("Invalid number of arguments")
-      return
-    }
+    Logger.getLogger("org").setLevel(Level.ERROR)
+    Logger.getLogger("akka").setLevel(Level.ERROR)
+    Logger.getLogger("breeze").setLevel(Level.ERROR)
+    Logger.getLogger("com.intel.analytics.zoo").setLevel(Level.INFO)
+    val logger = Logger.getLogger(getClass)
     
     parser.parse(args, KafkaProducerParam()).foreach { params =>      
       while(true) { 
@@ -86,17 +90,17 @@ object ImageProducer {
               
               val imageName = file.getName()
               
-              println("Read from image path:")
-              println(file.getAbsolutePath())
+              logger.info("Read from image path:")
+              logger.info(file.getAbsolutePath())
                     
-              println("Image size:")
-              println(Math.toIntExact(file.length()))
+              logger.info("Image size:")
+              logger.info(Math.toIntExact(file.length()))
               
               val data = FileUtils.readFileToByteArray(file)                 
               
               if(data == null)
               {
-                println("Error reading from file")
+                logger.info("Error reading from file")
                 break
               }
               
@@ -106,16 +110,16 @@ object ImageProducer {
               producer.send(record)
               
               count = count + 1
-              println("Image successfully sent " + count)
+              logger.info("Image successfully sent " + count)
               
               Thread.sleep(params.txDelay)
             }
             catch {
               case e: ExecutionException =>
-                println("Error in sending record")
+                logger.info("Error in sending record")
                 e.printStackTrace()
               case e: InterruptedException =>
-                println("Error in sending record")
+                logger.info("Error in sending record")
                 e.printStackTrace()
             }        
           }

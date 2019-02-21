@@ -246,6 +246,11 @@
             <version>${spark.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-sql-kafka-0-10_2.11</artifactId>
+            <version>${spark.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.intel.analytics.bigdl</groupId>
             <artifactId>${bigdl.artifactId}</artifactId>
             <version>${bigdl.version}</version>
@@ -256,6 +261,11 @@
             <artifactId>unused</artifactId>
             <version>1.0.0</version>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.6</version>
         </dependency>
         <dependency>
             <groupId>org.tensorflow</groupId>
