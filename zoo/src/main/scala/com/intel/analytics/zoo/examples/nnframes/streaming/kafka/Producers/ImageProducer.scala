@@ -33,7 +33,8 @@ object ImageProducer {
                                 clientId: String = "",
                                 imageFolder: String = "",
                                 topic: String = "",
-                                txDelay: Int= 0)
+                                txDelay: Int= 0,
+                                numPartitions: Int=1)
 
   val parser = new OptionParser[KafkaProducerParam]("Image Kafka Producer") {
     head("Image Kafka Producer demo")
@@ -62,6 +63,11 @@ object ImageProducer {
       .text("Image folder location")
       .action((x, c) => c.copy(txDelay = x))
       .required()
+      
+    opt[Int]("numPartitions")
+      .text("number of partitions")
+      .action((x, c) => c.copy(numPartitions = x))
+      .required()
   }
   
   def main(args: Array[String]): Unit = {
@@ -74,8 +80,8 @@ object ImageProducer {
     parser.parse(args, KafkaProducerParam()).foreach { params =>      
       while(true) { 
         
-        val producer = ImageProducerFactory.createProducer(params.brokers, params.clientId)
-        
+        val producer = ImageProducerFactory.createProducer(params.brokers, params.clientId, params.numPartitions)
+    
         /*if(!Files.notExists(Paths.get(args(0))))
         {
           throw new IllegalArgumentException("check command line arguments")

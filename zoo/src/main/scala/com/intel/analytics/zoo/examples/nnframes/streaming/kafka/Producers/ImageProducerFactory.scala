@@ -12,12 +12,13 @@ import org.apache.kafka.common.serialization.StringSerializer
 
 object ImageProducerFactory {
 
-  def createProducer(brokers: String, clientId: String) : KafkaProducer[String, ImageFeature] = {
+  def createProducer(brokers: String, clientId: String, partitions: Int) : KafkaProducer[String, ImageFeature] = {
     var prop = new Properties()
     prop.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers)
     prop.put(ProducerConfig.CLIENT_ID_CONFIG, clientId)
     prop.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[StringSerializer])
     prop.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, classOf[CustomObjectSerializer])
+    //prop.put("num.partitions", partitions.toString())
     
     return new KafkaProducer[String, ImageFeature](prop);
   }

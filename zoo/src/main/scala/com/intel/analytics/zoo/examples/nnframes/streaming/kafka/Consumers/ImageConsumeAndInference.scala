@@ -70,6 +70,16 @@ import java.security.Key
 import scala.util.Properties
 import java.util.Properties
 import java.io.FileInputStream
+import shapeless.ops.nat.ToInt
+import scala.collection.mutable.ListBuffer
+import org.apache.spark.streaming.dstream.DStream
+
+import com.intel.analytics.zoo.feature.common.Preprocessing
+import org.apache.spark.sql.Row,com.intel.analytics.bigdl.tensor.Tensor
+
+import scala.collection.convert._
+import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 
 class ImageConsumeAndInference(prop: Properties) extends Serializable {
@@ -189,52 +199,93 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
   
   def doClassify(rdd : RDD[ImageFeature]) : Unit =  {
     logger.info(s"Start classification")
-    val notNullRDDs = rdd.filter(f => (f != null && f.bytes() != null ))
+    val notNullRDDs = rdd.filter(f => (f != null && f.bytes() != null ))   
     val count = notNullRDDs.count()
-    logger.info("RDD Count:" + count)
-    if(count > 0)
-    {
+    logger.info(s"Start classification")
+    if (count > 0) {
       logger.info(s"Non-Empty RDD start processing")
-      //val data = ImageSet.rdd(rdd.coalesce(nPartition, true))    
-      
-      
-      val getImageName = udf { row: Row => row.getString(0)}        
-      val data = ImageSet.rdd(notNullRDDs)
-      val mappedData = ImageSet.streamread(data, minPartitions = prop.getProperty("rdd.partition").toInt,
-                        resizeH = 256, resizeW = 256, imageCodec = 1)
-      val rowRDD = mappedData.toDistributed().rdd.map { imf => Row(NNImageSchema.imf2Row(imf))}
-      val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowRDD, imageColumnSchema)
-                  .repartition(prop.getProperty("rdd.partition").toInt)
-                  .withColumn("imageName", getImageName(col("image")))
-                  
-      logger.info("#partitions: " + imageDF.rdd.partitions.length)
-      logger.info("master: " + sc.master) 
-      //imageDF.cache().collect()
+      //val data = ImageSet.rdd(rdd.coalesce(nPartition, true))
 
       val transformer = RowToImageFeature() -> ImageCenterCrop(224, 224) ->
-      ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
+        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
 
       val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
       val dlmodel = NNClassifierModel(model, transformer)
-                    .setBatchSize(prop.getProperty("inference.batchsize").toInt)
-                    .setFeaturesCol("image")
-                    .setPredictionCol("prediction")
+        .setBatchSize(prop.getProperty("inference.batchsize").toInt)
+        .setFeaturesCol("image")
+        .setPredictionCol("prediction")
 
       val st = System.nanoTime()
-      val resultDF = dlmodel.transform(imageDF)
-      resultDF.collect()
-      val time = (System.nanoTime() - st)/1e9
-      logger.info("inference finished in " + time)
-      logger.info("throughput: " + count / time)
-
+      
+      if (prop.getProperty("inference.mode") == "local") {
+        localInference(notNullRDDs, dlmodel, transformer)      
+      } else {    
+        distributedInference(notNullRDDs, dlmodel, transformer, sc) 
+      }       
+        
+      val inferTime = (System.nanoTime() - st) / 1e9
+      logger.info("inference finished in " + inferTime)
+      logger.info("throughput: " + count / inferTime)
       //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
-    }
+    }    
   }
   
   private val imageColumnSchema =
     StructType(StructField("image", NNImageSchema.byteSchema, true) :: Nil)
     
-  private val TOPIC = Array(prop.getProperty("kafka.topic"))
+  private val TOPIC = Array(prop.getProperty("kafka.topic"))  
+  
+  /**
+   * read images from local file system and run inference locally without sparkcontext
+   * master = local[x]
+   * only support local file system
+   */
+  def localInference(
+      rdd : RDD[ImageFeature],
+      model: NNClassifierModel[Float],
+      transformer: Preprocessing[Row,Tensor[Float]]): Unit = {
+    
+    val getImageName = udf { row: Row => row.getString(0) }
+    val data = ImageSet.array(rdd.collect())
+    val mappedData = ImageSet.streamread(data, minPartitions = prop.getProperty("rdd.partition").toInt,
+      resizeH = 256, resizeW = 256, imageCodec = 1)
+    
+    val rowData = mappedData.toLocal().array.map { imf => Row(NNImageSchema.imf2Row(imf)) }.toList   
+    val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowData.asJava, imageColumnSchema)
+                .withColumn("imageName", getImageName(col("image")))
+    //imageDF.cache().collect()
+                
+    val resultDF = model.transform(imageDF)
+    resultDF.collect()
+    //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
+  }
+
+  /**
+   * run inference in cluster mode, with spark overhead.
+   * use master = local[x] or yarn
+   * support HDFS path
+   */
+  def distributedInference(
+      rdd : RDD[ImageFeature],
+      model: NNClassifierModel[Float],
+      transformer: Preprocessing[Row,Tensor[Float]],
+      sc: SparkContext): Unit = {
+    
+    
+    val getImageName = udf { row: Row => row.getString(0)}
+    val data = ImageSet.rdd(rdd)
+    val mappedData = ImageSet.streamread(data, minPartitions = prop.getProperty("rdd.partition").toInt,
+                      resizeH = 256, resizeW = 256, imageCodec = 1)
+    val rowRDD = mappedData.toDistributed().rdd.map { imf => Row(NNImageSchema.imf2Row(imf))}
+    val imageDF = SQLContext.getOrCreate(sc).createDataFrame(rowRDD, imageColumnSchema)
+                .repartition(prop.getProperty("rdd.partition").toInt)
+                .withColumn("imageName", getImageName(col("image")))
+    //imageDF.cache().collect()
+    
+    val resultDF = model.transform(imageDF)
+    resultDF.collect()    
+    //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
+  }
 
   def stream() = {
     
@@ -257,9 +308,37 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
       ConsumerConfig.GROUP_ID_CONFIG ->  prop.getProperty("group.id")
     )
   
-    sc = NNContext.initNNContext(conf)              
+    sc = NNContext.initNNContext(conf) 
         
     val ssc = new StreamingContext(sc, new Duration(prop.getProperty("streaming.batch.duration").toInt))
+    
+    
+    var imageDStreamArray = new ListBuffer[DStream[ImageFeature]]()
+
+    for ( i <- 1 to prop.getProperty("num.receivers").toInt) {
+      val inputStream = KafkaUtils.createDirectStream[String, ImageFeature](
+                                          ssc
+                                          , PreferConsistent
+                                          , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
+                                        )
+                                        
+                                        
+      imageDStreamArray += inputStream.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value())
+    }
+    
+    var imageDStream: DStream[ImageFeature] = null
+    
+    for(stream <- imageDStreamArray)
+    {
+      if(imageDStream == null)
+        imageDStream = stream
+      else
+        imageDStream = imageDStream.union(stream)        
+    }
+      
+ 
+    imageDStream.foreachRDD(rdd => doClassify(rdd))
+    
     
     val stream: InputDStream[ConsumerRecord[String, ImageFeature]] =  KafkaUtils.createDirectStream[String, ImageFeature](
       ssc
