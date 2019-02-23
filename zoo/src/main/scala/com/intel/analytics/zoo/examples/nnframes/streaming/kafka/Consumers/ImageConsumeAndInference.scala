@@ -286,6 +286,8 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
     resultDF.collect()    
     //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
   }
+  
+  def union(s: DStream[ImageFeature], t: DStream[ImageFeature]): DStream[ImageFeature] = (s.union(t))
 
   def stream() = {
     
@@ -312,46 +314,22 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
         
     val ssc = new StreamingContext(sc, new Duration(prop.getProperty("streaming.batch.duration").toInt))
     
+    val imageDStreamArray = new ListBuffer[DStream[ImageFeature]]
     
-    var imageDStreamArray = new ListBuffer[DStream[ImageFeature]]()
-
-    for ( i <- 1 to prop.getProperty("num.receivers").toInt) {
+    for ( i <- 1 to prop.getProperty("num.receivers").toInt)
+    {    
       val inputStream = KafkaUtils.createDirectStream[String, ImageFeature](
-                                          ssc
-                                          , PreferConsistent
-                                          , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
-                                        )
-                                        
-                                        
-      imageDStreamArray += inputStream.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value())
-    }
-    
-    var imageDStream: DStream[ImageFeature] = null
-    
-    for(stream <- imageDStreamArray)
-    {
-      if(imageDStream == null)
-        imageDStream = stream
-      else
-        imageDStream = imageDStream.union(stream)        
-    }
+                                            ssc
+                                            , PreferConsistent
+                                            , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
+                                          )
+                                          
+      imageDStreamArray += inputStream.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value())   
       
- 
-    imageDStream.foreachRDD(rdd => doClassify(rdd))
+    }
     
-    
-    val stream: InputDStream[ConsumerRecord[String, ImageFeature]] =  KafkaUtils.createDirectStream[String, ImageFeature](
-      ssc
-      , PreferConsistent
-      , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
-    )
-    
-    logger.info(s"Load model and start socket stream")    
-    
-    stream.foreachRDD((kafkaRDD: RDD[ConsumerRecord[String, ImageFeature]], t) => {
-      val rdd = kafkaRDD.map(row => row.value()) 
-      doClassify(rdd)
-    })
+    val imageDStream = imageDStreamArray.reduceLeft(union)      
+    imageDStream.foreachRDD(rdd => doClassify(rdd))     
     
     ssc.start()  
     ssc.awaitTermination();
