@@ -286,8 +286,6 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
     resultDF.collect()    
     //resultDF.select("imageName", "prediction").orderBy("imageName").show(10, false)
   }
-  
-  def union(s: DStream[ImageFeature], t: DStream[ImageFeature]): DStream[ImageFeature] = (s.union(t))
 
   def stream() = {
     
@@ -313,23 +311,21 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
     sc = NNContext.initNNContext(conf) 
         
     val ssc = new StreamingContext(sc, new Duration(prop.getProperty("streaming.batch.duration").toInt))
-    
-    val imageDStreamArray = new ListBuffer[DStream[ImageFeature]]
-    
-    for ( i <- 1 to prop.getProperty("num.receivers").toInt)
-    {    
-      val inputStream = KafkaUtils.createDirectStream[String, ImageFeature](
-                                            ssc
-                                            , PreferConsistent
-                                            , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
-                                          )
-                                          
-      imageDStreamArray += inputStream.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value())   
-      
+        
+    val dStream = {
+      val streams = (1 to prop.getProperty("num.receivers").toInt).map(i =>
+                      KafkaUtils.createDirectStream[String, ImageFeature](
+                        ssc
+                        , PreferConsistent
+                        , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
+                      )
+                    )
+      ssc.union(streams) 
     }
     
-    val imageDStream = imageDStreamArray.reduceLeft(union)      
-    imageDStream.foreachRDD(rdd => doClassify(rdd))     
+    val microbatch = dStream.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value()) 
+    
+    microbatch.foreachRDD(rdd => doClassify(rdd)) 
     
     ssc.start()  
     ssc.awaitTermination();
