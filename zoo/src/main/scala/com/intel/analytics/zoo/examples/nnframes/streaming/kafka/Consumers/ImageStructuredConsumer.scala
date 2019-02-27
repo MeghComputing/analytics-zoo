@@ -176,7 +176,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
         val prediction = localModel.predictImage(localImageSet.toImageFrame())
           .toLocal().array.map(_.predict()).head.asInstanceOf[Tensor[Float]].toArray()
         val predictClass = prediction.zipWithIndex.maxBy(_._1)._2
-        logger.info(s"read, transform and inference takes: ${(System.nanoTime() - st) / 1e9} s.")
+        logger.info(s"transform and inference takes: ${(System.nanoTime() - st) / 1e9} s.")
         predictClass
       } catch {
         case e: Exception => logger.error(e)
