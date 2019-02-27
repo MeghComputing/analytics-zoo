@@ -26,8 +26,6 @@ import org.apache.kafka.common.serialization.StringSerializer
 import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Serializers._
 
 object ImageProducer {
-  
-  val TOPIC: String = "imagestream1"
 
   case class KafkaProducerParam(brokers: String = "",
                                 clientId: String = "",
