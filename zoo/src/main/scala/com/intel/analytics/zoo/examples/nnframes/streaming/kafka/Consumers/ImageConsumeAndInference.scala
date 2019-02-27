@@ -312,18 +312,14 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
         
     val ssc = new StreamingContext(sc, new Duration(prop.getProperty("streaming.batch.duration").toInt))
         
-    val dStream = {
-      val streams = (1 to prop.getProperty("num.receivers").toInt).map(i =>
-                      KafkaUtils.createDirectStream[String, ImageFeature](
-                        ssc
-                        , PreferConsistent
-                        , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
-                      )
-                    )
-      ssc.union(streams) 
-    }
     
-    val microbatch = dStream.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value()) 
+    val streams = KafkaUtils.createDirectStream[String, ImageFeature](
+                    ssc
+                    , PreferConsistent
+                    , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
+                  )   
+    
+    val microbatch = streams.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value()) 
     
     microbatch.foreachRDD(rdd => doClassify(rdd)) 
     
