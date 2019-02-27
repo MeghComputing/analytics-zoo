@@ -35,6 +35,9 @@ import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.Duration
 import org.apache.spark.streaming.dstream.SocketInputDStream
 //import org.apache.spark.streaming
+import scala.util.Properties
+import java.util.Properties
+import java.io.FileInputStream
 
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.api.java.function.Function
@@ -81,46 +84,44 @@ import org.opencv.core.{CvType, Mat}
 import com.intel.analytics.bigdl.transform.vision.image.opencv.OpenCVMat
 import org.opencv.imgcodecs.Imgcodecs
 
-import com.intel.analytics.bigdl.utils.Engine
-
 import java.util.Base64
 import java.beans.Encoder
 
 
-class ImageStructuredConsumer(module: String = "",
-                     host: String = "",
-                     port: Int = 9990,
-                     nPartition: Int = 1,
-                     batchSize: Int = 4
-) extends Serializable {
+class ImageStructuredConsumer(prop: Properties) extends Serializable {
   @transient lazy val logger = Logger.getLogger("meghlogger")
   @transient var sc: SparkContext = _  
   
   private val imageColumnSchema =
     StructType(StructField("image", NNImageSchema.byteSchema, true) :: Nil)
     
-  private val KAFKA_BROKERS = "222.10.0.51:9092"
-  private val GROUP_ID = "consumerGroup1"
-  private val TOPIC = Array("imagestream1")
-  private val MAX_POLL_RECORDS: Integer = 1
-  private val OFFSET_RESET_EARLIER = "earliest"
+  private val TOPIC = Array(prop.getProperty("kafka.topic"))
 
   def stream() = {
     logger.setLevel(Level.ALL)
     
     logger.info(s"Start DF Stream")
+    
+    val conf = new SparkConf().set("spark.streaming.receiver.maxRate", prop.getProperty("spark.streaming.receiver.maxRate"))
+                  .set("spark.streaming.kafka.maxRatePerPartition", prop.getProperty("spark.streaming.kafka.maxRatePerPartition"))
+                  .set("spark.shuffle.reduceLocality.enabled", prop.getProperty("spark.shuffle.reduceLocality.enabled"))
+                  .set("spark.shuffle.blockTransferService", prop.getProperty("spark.shuffle.blockTransferService"))
+                  .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
+                  .set("spark.speculation", prop.getProperty("spark.speculation"))
+                  .setAppName(prop.getProperty("spark.app.name"))
                   
-    val sc = NNContext.initNNContext("imageinfer")
-    val spark = SparkSession
-      .builder.config(sc.getConf)
-      .config("spark.streaming.receiver.maxRate", "50")
-      .config("spark.streaming.kafka.maxRatePerPartition", "50")
-      .config("spark.shuffle.reduceLocality.enabled", "false")
-      .config("spark.shuffle.blockTransferService", "nio")
-      .config("spark.scheduler.minRegisteredResourcesRatio", "1.0")
-      .config("spark.speculation", "false")
-      .getOrCreate() 
-                    
+    /*val kafkaConf = Map[String, Object](
+      ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> prop.getProperty("bootstrap.servers"),
+      ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
+      ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
+      ConsumerConfig.MAX_POLL_RECORDS_CONFIG -> prop.getProperty("max.poll.records"),
+      ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> prop.getProperty("enable.auto.commit.config"),
+      ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> prop.getProperty("auto.offset.reset"),
+      ConsumerConfig.GROUP_ID_CONFIG ->  prop.getProperty("group.id")
+    )*/
+    
+    //SparkSesion
+    sc = NNContext.initNNContext(conf)
   	
   	//create schema for json message
     val schema = StructType(Seq(
@@ -132,29 +133,31 @@ class ImageStructuredConsumer(module: String = "",
       StructField("data", DataTypes.StringType, true)  
     ))
     
+    Logger.getLogger("org").setLevel(Level.WARN)
+    
     val transformer = BufferedImageResize(256, 256) ->
         ImageBytesToMat(imageCodec = 1) -> ImageCenterCrop(224, 224) ->
         ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageSetToSample()
         
-    val model = Module.loadModule[Float](module)
+    val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
     val featureTransformersBC = sc.broadcast(transformer)
     val modelBroadCast = ModelBroadcast[Float]().broadcast(sc, model.evaluate())
     
     val imgFEncoder = Encoders.bean(classOf[ImageFeature])
 
     //Create DataSet from stream messages from kafka
-    val streamData = spark
+    val streamData = SQLContext.getOrCreate(sc).sparkSession
       .readStream     
       .format("kafka")      
-      .option("kafka.bootstrap.servers", KAFKA_BROKERS)
-      .option("subscribe", "imagestream1")
-      .option("kafka.max.poll.records", MAX_POLL_RECORDS.toString())
+      .option("kafka.bootstrap.servers", prop.getProperty("bootstrap.servers"))
+      .option("subscribe", prop.getProperty("kafka.topic"))
+      .option("kafka.max.poll.records", prop.getProperty("max.poll.records"))
       .load()
       .selectExpr("CAST(value AS STRING) as image")
       .select(from_json(col("image"),schema=schema).as("image"))
       .select("image.*")
       .as(Encoders.product[JSonImage])      
-      //.repartition(nPartition)
+      //.repartition(prop.getProperty("rdd.partition").toInt)
      
     val predictImageUDF = udf ( (uri : String, data: Array[Byte]) => {
       try {
@@ -205,46 +208,31 @@ object ImageStructuredConsumer{
   val logger = Logger.getLogger(getClass)
   logger.setLevel(Level.ALL)
 
-  case class TopNClassificationParam(model: String = "",
-                                     host: String = "",
-                                     port: Int = 9990,
-                                     nPartition: Int = 1,
-                                     batchSize: Int = 4)
+  case class TopNClassificationParam(propFile: String= "")
 
   val parser = new OptionParser[TopNClassificationParam]("ImageClassification demo") {
     head("Analytics Zoo ImageClassification demo")
    
-    opt[String]("host")
-      .text("host ip to connect to")
-      .action((x, c) => c.copy(host = x))
-      .required()      
-    opt[Int]("port")
-      .text("port to connect to")
-      .action((x, c) => c.copy(port = x))
-      .required()
-    opt[String]("model")
-      .text("Analytics Zoo model")
-      .action((x, c) => c.copy(model = x))
-      .required()
-    opt[Int]('p', "partition")
-      .text("number of partitions")
-      .action((x, c) => c.copy(nPartition = x))
-      .required()
-    opt[Int]('b', "batchSize")
-      .text("batch size")
-      .action((x, c) => c.copy(batchSize = x))
-      .required()
+    opt[String]("propFile")
+      .text("properties files")
+      .action((x, c) => c.copy(propFile = x))
+      .required() 
   }   
 
   def main(args: Array[String]): Unit = {
       parser.parse(args, TopNClassificationParam()).foreach { params =>
+      val prop = new Properties()
       
-      var sparkDriver = new ImageStructuredConsumer(params.model,
-  				        params.host,
-  				        params.port,
-  				        params.nPartition,
-  				        params.batchSize) 
+      try {        
+        prop.load(new FileInputStream(params.propFile))
+      } catch { case e: Exception => 
+        e.printStackTrace()
+        sys.exit(1)
+      }
+      
+      val sparkDriver = new ImageStructuredConsumer(prop) 
       sparkDriver.stream()
     }
   }
 }
+
