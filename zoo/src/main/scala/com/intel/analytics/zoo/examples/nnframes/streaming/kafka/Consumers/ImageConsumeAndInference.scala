@@ -85,119 +85,10 @@ import scala.collection.JavaConverters._
 class ImageConsumeAndInference(prop: Properties) extends Serializable {
   @transient lazy val logger = Logger.getLogger("meghlogger")
   @transient var sc: SparkContext = _
-
-  def bytesToImageObjects(is: InputStream) : Iterator[ImageFeature] = {
-      val dis = new DataInputStream(is)  
-
-      class ImageIterator extends Iterator[ImageFeature] with Serializable {
-        private var gotNext = false
-        private var nextValue: ImageFeature = _
-        protected var finished = false
-        val sw = new StringWriter
-        
-         def getNext():Unit = {
-             //logger.info("Start get next");
-             try {
-               //logger.info("Start reading record");
-               
-               val nameSize = new Array[Byte](4);
-    	         dis.readFully(nameSize, 0, 4);
-               val strLen = ByteBuffer.wrap(nameSize).order(ByteOrder.BIG_ENDIAN).getInt();
-    	         //logger.info("Image name length: " + strLen);
-    
-    	         if (strLen <= 0 || strLen > 28) {
-    	             logger.info("Image file name size is null or invalid");
-    	             finished = true;
-    	             dis.close();
-    	             return
-    	         }
-            
-    	         val name = new Array[Byte](strLen);
-    	         dis.readFully(name, 0, strLen);
-               val imageName = new String(name)
-               if (imageName == null || imageName.isEmpty()) {
-    	             logger.info("Image filename is null or empty");
-    	             finished = true;
-    	             dis.close();
-    	             return
-    	         }
-    						
-               //logger.info("Image filename: " + imageName);                
-               
-    						
-               val imgLen = new Array[Byte](4);
-    	         dis.readFully(imgLen, 0, 4);
-               val len = ByteBuffer.wrap(imgLen).order(ByteOrder.BIG_ENDIAN).getInt();
-    	         //logger.info("Image size: " + len);
-    
-    	         if (len <= 0) {
-    	             finished = true;
-    	             dis.close();
-    	             return
-    	         }
-    
-    	         val data = new Array[Byte](len);
-    	         dis.readFully(data, 0, len);
-    	         
-    	         try{    	             
-    	             nextValue = ImageFeature(data, uri = imageName)    
-                   if (nextValue.bytes() == null) {
-                       logger.info("Next value empty!!");
-        	             finished = true;
-        	             dis.close();
-        	             return
-        	         }
-    	         }
-    	         catch {               
-                   case e: Exception => e.printStackTrace(new PrintWriter(sw))
-                   finished = true;
-                   dis.close();
-                   logger.error(sw.toString())
-               }
-               
-               //logger.info("Next value fine");
-             }
-             catch {               
-               case e: Exception => e.printStackTrace(new PrintWriter(sw))
-               finished = true;
-               logger.error(sw.toString())
-             }
-          //logger.info("End get next");
-          gotNext = true
-        }  
-      
-        override def hasNext: Boolean = {
-          //logger.info("Start hasNext");
-          if (!finished) {
-            if (!gotNext) {
-              getNext()
-              if (finished) {
-                finished = true;
-                dis.close()
-              }
-            }
-          }
-          //gger.info("End hasNext");
-          !finished
-        }
-      
-        override def next(): ImageFeature = {
-          //logger.info("Start next");
-          if (finished) {
-            throw new NoSuchElementException("End of stream")            
-          }
-          if(!gotNext)
-            getNext()
-          gotNext = false
-          //logger.info("End next");
-          nextValue
-        }        
-      }
-      
-      new ImageIterator
-  }
   
-  def doClassify(rdd : RDD[ImageFeature]) : Unit =  {
+  def doClassify(rdd : RDD[ImageFeature],
+                  model: NNClassifierModel[Float],
+                  transformer: Preprocessing[Row,Tensor[Float]]) : Unit =  {
     logger.info(s"Start classification")
     val notNullRDDs = rdd.filter(f => (f != null && f.bytes() != null ))   
     val count = notNullRDDs.count()
@@ -206,21 +97,12 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
       logger.info(s"Non-Empty RDD start processing")
       //val data = ImageSet.rdd(rdd.coalesce(nPartition, true))
 
-      val transformer = RowToImageFeature() -> ImageCenterCrop(224, 224) ->
-        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
-
-      val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
-      val dlmodel = NNClassifierModel(model, transformer)
-        .setBatchSize(prop.getProperty("inference.batchsize").toInt)
-        .setFeaturesCol("image")
-        .setPredictionCol("prediction")
-
       val st = System.nanoTime()
       
       if (prop.getProperty("inference.mode") == "local") {
-        localInference(notNullRDDs, dlmodel, transformer)      
+        localInference(notNullRDDs, model, transformer)      
       } else {    
-        distributedInference(notNullRDDs, dlmodel, transformer, sc) 
+        distributedInference(notNullRDDs, model, transformer, sc) 
       }       
         
       val inferTime = (System.nanoTime() - st) / 1e9
@@ -321,7 +203,16 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
     
     val microbatch = streams.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value()) 
     
-    microbatch.foreachRDD(rdd => doClassify(rdd)) 
+    val transformer = RowToImageFeature() -> ImageCenterCrop(224, 224) ->
+        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
+
+    val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
+    val dlmodel = NNClassifierModel(model, transformer)
+      .setBatchSize(prop.getProperty("inference.batchsize").toInt)
+      .setFeaturesCol("image")
+      .setPredictionCol("prediction")
+    
+    microbatch.foreachRDD(rdd => doClassify(rdd, dlmodel, transformer)) 
     
     ssc.start()  
     ssc.awaitTermination();
