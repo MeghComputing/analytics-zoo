@@ -11,6 +11,7 @@ You can download pre-trained models from [Image Classification](https://github.c
 Put your image data for prediction in one folder.
 
 ### Run this to start streaming images through an IP and port
+```shell
 IMAGEDIR=... // the folder in which images are stored
 HOST_IP=... // IP of the host on which the streaming application streams images
 PORT=... // Port through the images are streamed
@@ -18,13 +19,15 @@ JARDIR=... // location of the built JAR
 DELAY=... // delay between consecutive images sent
 
 java -cp ${JARDIR}/analytics-zoo-bigdl_0.7.2-spark_2.3.1-0.4.0-SNAPSHOT-jar-with-dependencies-and-spark.jar com.intel.analytics.zoo.examples.nnframes.streaming.ImageSocketProducer --host ${HOST_IP} --port ${PORT} --imageFolder ${IMAGEDIR} --txDelay ${DELAY}
+```
 
 ### Run this example to start ingestion followed by inferencing
 Run the following command for Spark local mode (MASTER=local[*]) or cluster mode:
 ```bash
-export LOGDIR=... // Directory where the log4j.properties files is maintained
-export SPARK_HOME=.. // the root directory of spark
 export PATH=$PATH:${SPARK_HOME}/bin 
+
+LOGDIR=... // Directory where the log4j.properties files is maintained
+SPARK_HOME=.. // the root directory of spark
 MASTER=... // local[*] or spark://host-ip:port
 MODELPATH=... // model path. Local file system/HDFS/Amazon S3 are supported
 JARDIR=... // location of the built JAR
