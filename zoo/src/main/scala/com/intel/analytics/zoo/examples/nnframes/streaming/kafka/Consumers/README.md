@@ -15,7 +15,7 @@ Apart from setting up spark, please setup zookeeper and kafka servers as per ins
 ### Prepare predict dataset
 Put your image data for prediction in one folder.
 
-###Micro batch RDDs
+### Micro batch RDDs
 
 #### Run this to start kafka image producer
 ```shell
@@ -55,7 +55,7 @@ spark-submit \
 --conf "spark.executor.extraJavaOptions=-Dlog4j.configuration=file:$LOGDIR/log4j.properties" \
 --class com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Consumers.ImageConsumeAndInference ${JARDIR}/analytics-zoo-bigdl_0.7.2-spark_2.3.1-0.4.0-SNAPSHOT-jar-with-dependencies-and-spark.jar --propFile ${STREAMING_PROP}
 ```
-###Structured Streaming
+### Structured Streaming
 
 #### Run this to start kafka image producer
 ```shell

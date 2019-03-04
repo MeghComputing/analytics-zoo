@@ -14,7 +14,7 @@ Put your image data for prediction in one folder.
 ```shell
 IMAGEDIR=... // the folder in which images are stored
 HOST_IP=... // IP of the host on which the streaming application streams images
-PORT=... // Port through the images are streamed
+PORT=... // Port through which the images are streamed
 JARDIR=... // location of the built JAR
 DELAY=... // delay between consecutive images sent
 
