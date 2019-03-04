@@ -1,4 +1,4 @@
-## Image Inference example - with Dataframes
+## Image Inference Streaming example - with Dataframes
 This example illustrates how to ingest images through a spark socket connector and pass it through an image inferencing pipeline
 
 ## Download Analytics Zoo
@@ -26,12 +26,12 @@ Run the following command for Spark local mode (MASTER=local[*]) or cluster mode
 ```bash
 export PATH=$PATH:${SPARK_HOME}/bin 
 
-LOGDIR=... // Directory where the log4j.properties files is maintained
+LOGDIR=... // Directory where the log4j.properties files is maintained (sample log properties file in zoo/src/resources/)
 SPARK_HOME=.. // the root directory of spark
-MASTER=... // local[*] or spark://host-ip:port
+MASTER=... // local[*] or spark://driver-ip:port
 MODELPATH=... // model path. Local file system/HDFS/Amazon S3 are supported
 JARDIR=... // location of the built JAR
-MODE= ... // local or distributed
+MODE= ... // "local" or "distributed"
 HOST_IP=... // IP of the host on which the streaming application streams images
 PORT=... // Port through the images are streamed
 BATCHDURATION=... // Microbatch duration in milliseconds
