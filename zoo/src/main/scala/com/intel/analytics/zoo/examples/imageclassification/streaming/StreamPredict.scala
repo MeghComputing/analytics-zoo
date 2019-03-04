@@ -58,7 +58,7 @@ import org.apache.log4j.{Level, Logger}
 import org.opencv.core.{CvType, Mat}
 import org.opencv.imgcodecs.Imgcodecs
 
-class StreamTunedImgClassify(module: String = "",
+class StreamPredict(module: String = "",
                      host: String = "",
                      port: Int = 9990,
                      nPartition: Int = 1,
@@ -268,7 +268,7 @@ class StreamTunedImgClassify(module: String = "",
 
 }  
 
-object StreamTunedImgClassify{
+object StreamPredict{
   Logger.getLogger("org").setLevel(Level.ERROR)
   Logger.getLogger("akka").setLevel(Level.ERROR)
   Logger.getLogger("breeze").setLevel(Level.ERROR)
@@ -321,7 +321,7 @@ object StreamTunedImgClassify{
       parser.parse(args, TopNClassificationParam()).foreach { params =>
       require(Seq("local", "distributed").contains(params.mode))
       
-      var sparkDriver = new StreamTunedImgClassify(params.model,
+      var sparkDriver = new StreamPredict(params.model,
   				        params.host,
   				        params.port,
   				        params.nPartition,
