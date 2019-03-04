@@ -1,4 +1,4 @@
-package com.intel.analytics.zoo.examples.imageclassification
+package com.intel.analytics.zoo.examples.imageclassification.streaming
 
 import com.intel.analytics.bigdl.Module
 import com.intel.analytics.bigdl.nn.Module
@@ -183,17 +183,16 @@ class StreamTunedImgClassify(module: String = "",
       new ImageIterator
   }
    
-  def doClassify(rdd : RDD[ImageFeature]) : Unit =  {
+  def doClassify(rdd : RDD[ImageFeature],
+                 model: Module[Float],
+                 transformer: Preprocessing[ImageFeature, ImageFeature]) : Unit =  {
       logger.info(s"Start classification")
       val count = rdd.count()
       logger.info("RDD Count:" + count)
       if(count > 0)
       {
         logger.info(s"Non-Empty RDD start processing")
-        val transformer = ImageResize(256, 256) -> ImageCenterCrop(224, 224) ->
-          ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageSetToSample()
-          
-        val model = Module.loadModule(module).evaluate()
+        
         val st = System.nanoTime()
         if (mode == "local") {
           localInference(rdd, model, transformer)      
@@ -218,7 +217,12 @@ class StreamTunedImgClassify(module: String = "",
         
     var imageDStream = ssc.socketStream(host, port, bytesToImageObjects, StorageLevel.MEMORY_AND_DISK_SER)
     
-    imageDStream.foreachRDD(rdd => doClassify(rdd))
+    val transformer = ImageResize(256, 256) -> ImageCenterCrop(224, 224) ->
+      ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageSetToSample()
+      
+    val dlmodel = Module.loadModule(module).evaluate()
+    
+    imageDStream.foreachRDD(rdd => doClassify(rdd, dlmodel, transformer))
     
     ssc.start()  
     ssc.awaitTermination();
