@@ -79,10 +79,8 @@ object ImageSocketProducer {
     
     parser.parse(args, ImageProducerParam()).foreach { params =>    
       
-      val sparkClientSocket = new ServerSocket(params.port, 1, InetAddress.getByName(params.host));
-      sparkClientSocket.setSoTimeout(0);
-      
-      
+      val sparkClientSocket = new ServerSocket(params.port, 1, InetAddress.getByName(params.host))
+      sparkClientSocket.setSoTimeout(0)      
       
       while(true) { 
         try{
@@ -97,7 +95,7 @@ object ImageSocketProducer {
             for(file <- dir) {
               try {
                 
-                out.flush();
+                out.flush()
                 out.writeInt(file.getName().length())
                 
                 logger.info("Image name size:")

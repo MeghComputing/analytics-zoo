@@ -1,5 +1,5 @@
 /* Copyright 2018 Analytics Zoo Authors.*/
-package com.intel.analytics.zoo.examples.nnframes.streaming.imageInference
+package com.intel.analytics.zoo.examples.nnframes.streaming
 
 import com.intel.analytics.bigdl.nn.Module
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric.NumericFloat

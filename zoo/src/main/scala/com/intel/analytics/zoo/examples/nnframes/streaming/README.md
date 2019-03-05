@@ -50,5 +50,5 @@ spark-submit \
 --total-executor-cores 4 \
 --driver-java-options "-Dlog4j.configuration=file:$LOGDIR/log4j.properties" \
 --conf "spark.executor.extraJavaOptions=-Dlog4j.configuration=file:$LOGDIR/log4j.properties" \
---class com.intel.analytics.zoo.examples.nnframes.streaming.imageInference.StreamInference ${JARDIR}/analytics-zoo-bigdl_0.7.2-spark_2.3.1-0.4.0-SNAPSHOT-jar-with-dependencies-and-spark.jar --model $MODELPATH/analytics-zoo_resnet-50_imagenet_0.1.0.model --batchSize 4 --partition 32 --host ${HOST_IP} --port ${PORT} --batchDuration ${BATCHDURATION} --mode ${MODE}
+--class com.intel.analytics.zoo.examples.nnframes.streaming.StreamInference ${JARDIR}/analytics-zoo-bigdl_0.7.2-spark_2.3.1-0.4.0-SNAPSHOT-jar-with-dependencies-and-spark.jar --model $MODELPATH/analytics-zoo_resnet-50_imagenet_0.1.0.model --batchSize 4 --partition 32 --host ${HOST_IP} --port ${PORT} --batchDuration ${BATCHDURATION} --mode ${MODE}
 ```
