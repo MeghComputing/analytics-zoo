@@ -273,6 +273,11 @@
            <version>2.9.8</version>
         </dependency>
         <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-scala_2.11</artifactId>
+            <version>2.9.8</version>
+        </dependency>
+        <dependency>
             <groupId>org.tensorflow</groupId>
             <artifactId>tensorflow</artifactId>
             <version>1.10.0</version>
@@ -282,6 +287,13 @@
             <artifactId>proto</artifactId>
             <version>1.10.0</version>
         </dependency>
+        <!-- opencv -->
+        <dependency>
+            <groupId>opencv</groupId>
+            <artifactId>opencv</artifactId>
+            <version>3.2.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -518,6 +530,29 @@
                             <goal>check</goal>
                         </goals>
                     </execution>-->
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-install-plugin</artifactId>
+                <version>2.5.2</version>
+                <executions>
+                    <execution>
+                        <id>install-external</id>
+                        <phase>clean</phase>
+                        <configuration>
+                            <file>${basedir}/src/lib/opencv/opencv-320.jar</file>
+                            <repositoryLayout>default</repositoryLayout>
+                            <groupId>opencv</groupId>
+                            <artifactId>opencv</artifactId>
+                            <version>3.2.0</version>
+                            <packaging>jar</packaging>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>

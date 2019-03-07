@@ -1,0 +1,29 @@
+#Kafka properties
+
+
+# Kafka Consumer
+bootstrap.servers=localhost:9092
+group.id=opencvImages
+auto.offset.reset=latest
+fetch.message.max.bytes=5242880
+enable.auto.commit.config=false
+consumer.topic=test
+
+
+#Kafka Producer
+#acks=all
+retries=0
+batch.size=20971520
+kafka.topic=test
+linger.ms=5
+max.request.size=2097152
+compression.type=gzip
+key.serializer=org.apache.kafka.common.serialization.StringSerializer
+value.serializer=org.apache.kafka.common.serialization.ByteArraySerializer
+
+
+#Spark Conf
+
+rdd.partition=16
+batchSize=4
+batchDuration=1000
