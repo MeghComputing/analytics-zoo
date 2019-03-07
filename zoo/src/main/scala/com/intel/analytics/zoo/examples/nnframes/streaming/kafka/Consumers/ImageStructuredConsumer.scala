@@ -6,13 +6,12 @@ import com.intel.analytics.bigdl.utils.LoggerFilter
 import com.intel.analytics.bigdl.models.utils.ModelBroadcast
 import com.intel.analytics.zoo.pipeline.nnframes._
 import com.intel.analytics.zoo.common.NNContext
-import com.intel.analytics.zoo.feature.image._
-import com.intel.analytics.zoo.feature.image.ImageSet
-import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
+import com.intel.analytics.zoo.feature.image.{ImageMatToTensor, ImageSet, _}
+import com.intel.analytics.bigdl.transform.vision.image.{ImageFeature, MatToFloats}
 import com.intel.analytics.zoo.models.image.imageclassification.{ImageClassifier, LabelOutput}
 import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Deserializers._
 import com.intel.analytics.bigdl.tensor.Tensor
-
+import com.intel.analytics.zoo.pipeline.inference.FloatInferenceModel
 import org.apache.spark.streaming.dstream.InputDStream
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
@@ -22,7 +21,6 @@ import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
 import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
 import org.apache.spark.streaming.kafka010.{CanCommitOffsets, HasOffsetRanges, KafkaUtils}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.functions._
@@ -30,7 +28,6 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.types.StructField
 import org.apache.spark.sql.SparkSession
-
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.Duration
 import org.apache.spark.streaming.dstream.SocketInputDStream
@@ -122,8 +119,8 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
     
     //SparkSesion
     sc = NNContext.initNNContext(conf)
-  	
-  	//create schema for json message
+ 
+  //create schema for json message
     val schema = StructType(Seq(
       StructField("origin", DataTypes.StringType, true), 
       StructField("height", DataTypes.IntegerType, true), 
@@ -137,11 +134,12 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
     
     val transformer = BufferedImageResize(256, 256) ->
         ImageBytesToMat(imageCodec = 1) -> ImageCenterCrop(224, 224) ->
-        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageSetToSample()
+        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
+    val featureTransformersBC = sc.broadcast(transformer)
         
     val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
-    val featureTransformersBC = sc.broadcast(transformer)
-    val modelBroadCast = ModelBroadcast[Float]().broadcast(sc, model.evaluate())
+    val inferModel = new FloatInferenceModel(model.evaluate())
+    val modelBroadCast = sc.broadcast(inferModel)
     
     val imgFEncoder = Encoders.bean(classOf[ImageFeature])
 
@@ -163,7 +161,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
       try {
         val st = System.nanoTime()
         val featureSteps = featureTransformersBC.value.clonePreprocessing()
-        val localModel = modelBroadCast.value()
+        val localModel = modelBroadCast.value
         
         val bytesData = Base64.getDecoder.decode(data)
         val imf = ImageFeature(bytesData, uri = uri)
@@ -172,16 +170,18 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
           -2
         
         val imgSet = ImageSet.array(Array(imf))
-        val localImageSet = imgSet.transform(featureSteps)
-        val prediction = localModel.predictImage(localImageSet.toImageFrame())
-          .toLocal().array.map(_.predict()).head.asInstanceOf[Tensor[Float]].toArray()
+        var inputTensor = featureSteps(imgSet.toLocal().array.iterator).next()
+        inputTensor = inputTensor.reshape(Array(1) ++ inputTensor.size())
+        val prediction = inferModel.predict(inputTensor).toTensor[Float].toArray()
         val predictClass = prediction.zipWithIndex.maxBy(_._1)._2
         logger.info(s"transform and inference takes: ${(System.nanoTime() - st) / 1e9} s.")
         predictClass
       } catch {
-        case e: Exception => logger.error(e)
-        e.printStackTrace()
-        -1
+        case e: Exception =>
+          logger.error(e)
+          e.printStackTrace()
+          println(e)
+          -1
       }
     })
 
