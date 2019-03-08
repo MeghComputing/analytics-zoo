@@ -30,13 +30,40 @@ import scopt.OptionParser
 
 
 
+object ImageReceiverAndProcessor {
+
+  case class ImageInferenceParams(file: String = "", modelPath: String = "")
+
+  val parser:OptionParser[ImageInferenceParams] = new OptionParser[ImageInferenceParams]("Image Inference") {
+    head("Image Classification using Analytics Zoo")
+
+    opt[String]("file")
+      .text("Kafka property file")
+      .action((x, c) => c.copy(file = x))
+      .required()
+    opt[String]("modelPath")
+      .text("Image classification model path")
+      .action((x, c) => c.copy(modelPath = x))
+      .required()
+  }
+
+  def main(args: Array[String]): Unit = {
+    parser.parse(args, ImageInferenceParams()).foreach { params =>
+      var inference = new ImageReceiverAndProcessor(params.file, params.modelPath)
+      inference.readData()
+    }
+  }
+}
+
+
 
 class ImageReceiverAndProcessor(file:String,modelPath:String) extends Serializable {
   val logger:Logger = LoggerFactory.getLogger(classOf[ImageReceiverAndProcessor])
 
   val props = new Properties()
-  try {val propFile = new FileInputStream(file)
-  props.load(propFile)
+  try {
+    val propFile = new FileInputStream(file)
+    props.load(propFile)
   }catch {
     case e:Exception => logger.info("Error while reading property file")
   }
@@ -50,9 +77,8 @@ class ImageReceiverAndProcessor(file:String,modelPath:String) extends Serializab
   val conf:SparkConf = new SparkConf().setAppName("Image Inference")
   val sc:SparkContext = NNContext.initNNContext(conf)
   val ssc = new StreamingContext(sc, Duration(props.getProperty("batchDuration").toLong))
+//  var imageID = sc.accumulator(0,"Image ID")
   val model:AbstractModule[Activity, Activity, Float] = Module.loadModule[Float](modelPath)
-
-  var imageID = sc.accumulator(0,"Image ID")
 
   val kafkaParams: Map[String, Object] = Map[String, Object](
     ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> props.getProperty("bootstrap.servers"),
@@ -69,7 +95,7 @@ class ImageReceiverAndProcessor(file:String,modelPath:String) extends Serializab
 
   def classifyImage(rdd:RDD[ImageFeature]) {
     val count = rdd.count()
-    val startTime =System.nanoTime()
+    val startTime = System.nanoTime()
     val transformer:Preprocessing[Row,Tensor[Float]] = RowToImageFeature() -> ImageCenterCrop(224, 224) ->
       ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
 
@@ -96,10 +122,12 @@ class ImageReceiverAndProcessor(file:String,modelPath:String) extends Serializab
 
       val endTime = System.nanoTime()
       val totalTime = (endTime - startTime)/1e9
-      logger.info("total inference finished in " +totalTime)
-      logger.info("overall throughput " + count / totalTime)
+      logger.info("Total inference finished in " +totalTime)
+      logger.info("Overall throughput " + count / totalTime)
+      resultDF.select("imageName", "prediction").
+              orderBy("imageName").
+              show(false)
 
-      resultDF.select("imageName", "prediction").orderBy("imageName").show(false)
     }catch {
       case e:Exception => logger.info("Error in classifying image ", e)
         e.printStackTrace()
@@ -123,10 +151,13 @@ class ImageReceiverAndProcessor(file:String,modelPath:String) extends Serializab
         if (kafkaRDDCount > 0) {
           var rdd = kafkaRDD.map(row => row.value())
           logger.info("Extracted RDD Count: " + rdd.count())
-          val imageName = "IMAGE_" + imageID.value + ".jpeg"
-          val newData = rdd.map(element => new ImageFeature(element, uri = imageName))
-          imageID += 1
-          classifyImage(newData)
+          val rddWithIndex = rdd.zipWithUniqueId()
+          val imageRDD = rddWithIndex.map{element =>
+            val imageName = "IMAGE_" + element._2 + ".jpeg"
+            new ImageFeature(element._1, uri = imageName)
+          }
+
+          classifyImage(imageRDD)
         }
       })
     }catch {
@@ -138,30 +169,5 @@ class ImageReceiverAndProcessor(file:String,modelPath:String) extends Serializab
     ssc.awaitTermination()
     ssc.stop()
   }
-
 }
 
-object ImageReceiverAndProcessor {
-
-  case class ImageInferenceParams(file: String = "", modelPath: String = "")
-
-  val parser:OptionParser[ImageInferenceParams] = new OptionParser[ImageInferenceParams]("Image Inference") {
-    head("Image Classification using Analytics Zoo")
-
-    opt[String]("file")
-      .text("kafka property file")
-      .action((x, c) => c.copy(file = x))
-      .required()
-    opt[String]("modelPath")
-      .text("image classification model path")
-      .action((x, c) => c.copy(modelPath = x))
-      .required()
-  }
-
-  def main(args: Array[String]): Unit = {
-    parser.parse(args, ImageInferenceParams()).foreach { params =>
-        var inference = new ImageReceiverAndProcessor(params.file, params.modelPath)
-        inference.readData()
-    }
-  }
-}

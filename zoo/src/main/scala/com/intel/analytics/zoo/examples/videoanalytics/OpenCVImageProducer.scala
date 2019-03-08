@@ -16,9 +16,7 @@ import scopt.OptionParser
 
 object OpenCVImageProducer {
 
-  case class ImageProducerParams(
-                                  file: String = "",
-                                  inputVideo: String = "")
+  case class ImageProducerParams(file: String = "", inputVideo: String = "")
 
   val parser:OptionParser[ImageProducerParams] = new OptionParser[ImageProducerParams]("Image Producer") {
     head("Image producer with Kafka and OpenCV")
@@ -34,8 +32,8 @@ object OpenCVImageProducer {
 
   def main(args: Array[String]): Unit = {
     parser.parse(args, ImageProducerParams()).foreach { params =>
-        var sparkDriver = new OpenCVImageProducer(params.file, params.inputVideo)
-        sparkDriver.videoToImages()
+        var imageProducer = new OpenCVImageProducer(params.file, params.inputVideo)
+        imageProducer.videoToImages()
     }
   }
 
@@ -72,19 +70,19 @@ object OpenCVImageProducer {
       val cam = new VideoCapture()
       cam.open(input)
 
-
       val video_length = cam.get(Videoio.CAP_PROP_FRAME_COUNT).asInstanceOf[Int]
       val frames_per_second = cam.get(Videoio.CAP_PROP_FPS).asInstanceOf[Int]
-
+//      var frame_number = cam.get(Videoio.CAP_PROP_POS_FRAMES).toInt
 
       logger.info("Number of frames " , +video_length)
-      logger.info("frames per second ", +frames_per_second)
+      logger.info("Frames per second ", +frames_per_second)
 
       val mat = new Mat()
 
       if (cam.isOpened)
         {
           while (cam.read(mat)) {
+
             val byteMat = new MatOfByte()
             Imgcodecs.imencode(".jpg", mat, byteMat)
             val imageBytes = byteMat.toArray
@@ -116,5 +114,4 @@ object OpenCVImageProducer {
       producer.close(100, TimeUnit.MILLISECONDS)
     }
   }
-
 }
