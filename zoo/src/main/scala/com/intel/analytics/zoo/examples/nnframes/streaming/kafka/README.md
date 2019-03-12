@@ -95,7 +95,3 @@ spark-submit \
 --conf "spark.executor.extraJavaOptions=-Dlog4j.configuration=file:$LOGDIR/log4j.properties" \
 --class com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Consumers.ImageStructuredConsumer ${JARDIR}/analytics-zoo-bigdl_0.7.2-spark_2.3.1-0.4.0-SNAPSHOT-jar-with-dependencies-and-spark.jar --propFile ${STREAMING_PROP}
 ```
-#### Current Issues faced with the structured streaming implementation
-##### This example runs in local mode. However, this example gives following error on the executor side when run in cluster mode:
-*[Executor task launch worker for task 3] ERROR meghlogger - java.lang.IllegalArgumentException: requirement failed: Engine.init: Core number is not initialized. Do you call Engine.init? See more at https://bigdl-project.github.io/master/#APIGuide/Engine/*
-
