@@ -178,6 +178,9 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
                             .set("spark.shuffle.blockTransferService", prop.getProperty("spark.shuffle.blockTransferService"))
                             .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
                             .set("spark.speculation", prop.getProperty("spark.speculation"))
+                            .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+                            .set("spark.kryo.registrationRequired", "true")
+                            .registerKryoClasses(Array(classOf[ImageFeature]))
                             .setAppName(prop.getProperty("spark.app.name"))
                 
     val kafkaConf = Map[String, Object](
