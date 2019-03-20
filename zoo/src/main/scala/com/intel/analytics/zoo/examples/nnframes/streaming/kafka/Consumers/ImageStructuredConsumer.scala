@@ -8,10 +8,11 @@ import com.intel.analytics.zoo.pipeline.nnframes._
 import com.intel.analytics.zoo.common.NNContext
 import com.intel.analytics.zoo.feature.image.{ImageMatToTensor, ImageSet, _}
 import com.intel.analytics.bigdl.transform.vision.image.{ImageFeature, MatToFloats}
-import com.intel.analytics.zoo.models.image.imageclassification.{ImageClassifier, LabelOutput}
+import com.intel.analytics.zoo.models.image.imageclassification.{ImageClassifier, LabelOutput, _}
 import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Deserializers._
 import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.zoo.pipeline.inference.FloatInferenceModel
+
 import org.apache.spark.streaming.dstream.InputDStream
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
@@ -31,6 +32,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.Duration
 import org.apache.spark.streaming.dstream.SocketInputDStream
+
 //import org.apache.spark.streaming
 import scala.util.Properties
 import java.util.Properties
@@ -120,7 +122,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
     //SparkSesion
     sc = NNContext.initNNContext(conf)
  
-  //create schema for json message
+    //create schema for json message
     val schema = StructType(Seq(
       StructField("origin", DataTypes.StringType, true), 
       StructField("height", DataTypes.IntegerType, true), 
@@ -132,9 +134,15 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
     
     Logger.getLogger("org").setLevel(Level.WARN)
     
-    val transformer = BufferedImageResize(256, 256) ->
+    val imageConfig = ImageClassificationConfig(prop.getProperty("model.name"), "imagenet", "0.1") // needs to set model.name in prop file
+    val transformer = BufferedImageResize(256, 256) -> 
+              ImageBytesToMat(imageCodec = 1) -> 
+              imageConfig.preProcessor ->
+              ImageFeatureToTensor()
+    
+    /*val transformer = BufferedImageResize(256, 256) ->
         ImageBytesToMat(imageCodec = 1) -> ImageCenterCrop(224, 224) ->
-        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()
+        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()*/
     val featureTransformersBC = sc.broadcast(transformer)
         
     val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
@@ -172,7 +180,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
         val imgSet = ImageSet.array(Array(imf))
         var inputTensor = featureSteps(imgSet.toLocal().array.iterator).next()
         inputTensor = inputTensor.reshape(Array(1) ++ inputTensor.size())
-        val prediction = inferModel.predict(inputTensor).toTensor[Float].toArray()
+        val prediction = inferModel.predict(inputTensor).toTensor[Float].squeeze().toArray()
         val predictClass = prediction.zipWithIndex.maxBy(_._1)._2
         logger.info(s"transform and inference takes: ${(System.nanoTime() - st) / 1e9} s.")
         predictClass
