@@ -150,8 +150,6 @@ class ImageContinuousConsumer(prop: Properties) extends Serializable {
     val inferModel = new FloatInferenceModel(model.evaluate())
     val modelBroadCast = sc.broadcast(inferModel)
 
-    val imgFEncoder = Encoders.bean(classOf[ImageFeature])
-
     //Create DataSet from stream messages from kafka
     val streamData = SQLContext.getOrCreate(sc).sparkSession
       .readStream
@@ -164,8 +162,6 @@ class ImageContinuousConsumer(prop: Properties) extends Serializable {
       .selectExpr("CAST(value AS STRING) as image")
       .select(from_json(col("image"),schema=schema).as("image"))
       .select("image.*")
-      .as(Encoders.product[JSonImage])
-    //.repartition(prop.getProperty("rdd.partition").toInt)
 
     val predictImageUDF = udf ( (uri : String, data: Array[Byte]) => {
       try {

@@ -148,13 +148,11 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
     val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
     val inferModel = new FloatInferenceModel(model.evaluate())
     val modelBroadCast = sc.broadcast(inferModel)
-    
-    val imgFEncoder = Encoders.bean(classOf[ImageFeature])
 
     //Create DataSet from stream messages from kafka
-    val streamData = SQLContext.getOrCreate(sc).sparkSession
+    val streamData = SQLContext.getOrCreate(sc).sparkSession      
       .readStream     
-      .format("kafka")      
+      .format("kafka")            
       .option("kafka.bootstrap.servers", prop.getProperty("bootstrap.servers"))
       .option("subscribe", prop.getProperty("kafka.topic"))
       .option("kafka.max.poll.records", prop.getProperty("max.poll.records"))
@@ -162,8 +160,6 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
       .selectExpr("CAST(value AS STRING) as image")
       .select(from_json(col("image"),schema=schema).as("image"))
       .select("image.*")
-      .as(Encoders.product[JSonImage])      
-      //.repartition(prop.getProperty("rdd.partition").toInt)
      
     val predictImageUDF = udf ( (uri : String, data: Array[Byte]) => {
       try {
@@ -199,7 +195,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
                 .writeStream
                 .outputMode("update")        
                 .format("console")
-                .option("truncate", false)        
+                .option("truncate", false)
                 .start() 
         
     query.awaitTermination()

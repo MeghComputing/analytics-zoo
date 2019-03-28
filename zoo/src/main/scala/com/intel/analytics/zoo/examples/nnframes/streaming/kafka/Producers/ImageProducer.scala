@@ -32,7 +32,8 @@ object ImageProducer {
                                 imageFolder: String = "",
                                 topic: String = "",
                                 txDelay: Int= 0,
-                                numPartitions: Int=1)
+                                numPartitions: Int=1,
+                                numImages: Int=1)
 
   val parser = new OptionParser[KafkaProducerParam]("Image Kafka Producer") {
     head("Image Kafka Producer demo")
@@ -66,6 +67,11 @@ object ImageProducer {
       .text("number of partitions")
       .action((x, c) => c.copy(numPartitions = x))
       .required()
+      
+    opt[Int]("numImages")
+      .text("number of images ti send")
+      .action((x, c) => c.copy(numImages = x))
+      .required()
   }
   
   def main(args: Array[String]): Unit = {
@@ -75,8 +81,9 @@ object ImageProducer {
     Logger.getLogger("com.intel.analytics.zoo").setLevel(Level.INFO)
     val logger = Logger.getLogger(getClass)
     
-    parser.parse(args, KafkaProducerParam()).foreach { params =>      
-      while(true) { 
+    parser.parse(args, KafkaProducerParam()).foreach { params => 
+      var count = 0
+      while(count < params.numImages) { 
         
         val producer = ImageProducerFactory.createProducer(params.brokers, params.clientId, params.numPartitions)
     
@@ -86,19 +93,17 @@ object ImageProducer {
         }*/
         
         val dir = new File(params.imageFolder).listFiles
-        var count = 0
-        
         if(dir != null) {
           for(file <- dir) {
             try {
               
               val imageName = file.getName()
               
-              logger.info("Read from image path:")
-              logger.info(file.getAbsolutePath())
+              //logger.info("Read from image path:")
+              //logger.info(file.getAbsolutePath())
                     
-              logger.info("Image size:")
-              logger.info(Math.toIntExact(file.length()))
+              //logger.info("Image size:")
+              //logger.info(Math.toIntExact(file.length()))
               
               val data = FileUtils.readFileToByteArray(file)                 
               
@@ -114,7 +119,19 @@ object ImageProducer {
               producer.send(record)
               
               count = count + 1
-              logger.info("Image successfully sent " + count)
+              //logger.info("Image successfully sent " + count)
+              //System.out.println("Image successfully sent " + count)
+              
+              if(count % 1000 == 0)
+              {
+                logger.info("Number of images successfully sent: " + count)
+              }
+              
+              if(count >= params.numImages)
+              {
+                logger.info("Sent all requested images. Count: " + count)
+                break;
+              }
               
               Thread.sleep(params.txDelay)
             }
