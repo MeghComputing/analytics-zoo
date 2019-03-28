@@ -124,11 +124,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
  
     //create schema for json message
     val schema = StructType(Seq(
-      StructField("origin", DataTypes.StringType, true), 
-      StructField("height", DataTypes.IntegerType, true), 
-      StructField("width", DataTypes.IntegerType, true), 
-      StructField("nChannels", DataTypes.IntegerType, true),
-      StructField("mode", DataTypes.IntegerType, true), 
+      StructField("origin", DataTypes.StringType, true),
       StructField("data", DataTypes.StringType, true)  
     ))
     
