@@ -202,7 +202,7 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
                     ssc
                     , PreferConsistent
                     , Subscribe[String, ImageFeature](TOPIC, kafkaConf)
-                  )   
+                  )
     
     val microbatch = streams.map((stream: ConsumerRecord[String, ImageFeature]) => stream.value()) 
     
@@ -218,7 +218,8 @@ class ImageConsumeAndInference(prop: Properties) extends Serializable {
     microbatch.foreachRDD(rdd => doClassify(rdd, dlmodel, transformer)) 
     
     ssc.start()  
-    ssc.awaitTermination();
+    ssc.awaitTerminationOrTimeout(prop.getProperty("app.exec.duration").toInt);
+    //ssc.awaitTermination();
    }
 }
 

@@ -105,7 +105,7 @@ object ImageStructuredProducer {
               println("Image size:");
               println(Math.toIntExact(file.length()));
               
-              val data = FileUtils.readFileToByteArray(file)                 
+              val data: Array[Byte] = FileUtils.readFileToByteArray(file)
               
               if(data == null)
               {
@@ -116,10 +116,6 @@ object ImageStructuredProducer {
               var obj = new JsonObject()
               var gson = new Gson()
               obj.addProperty("origin", imageName)
-              obj.addProperty("height", 0)
-              obj.addProperty("width", 0)
-              obj.addProperty("nChannels", 0)
-              obj.addProperty("mode", 0)
               obj.addProperty("data", Base64.getEncoder.encodeToString(data))  
               
               val record: ProducerRecord[String, String] = new ProducerRecord(TOPIC, UUID.randomUUID.toString, gson.toJson(obj))
