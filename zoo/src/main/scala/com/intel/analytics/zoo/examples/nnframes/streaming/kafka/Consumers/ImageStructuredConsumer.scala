@@ -2,89 +2,28 @@ package com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Consumers
 
 import com.intel.analytics.bigdl.nn.Module
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric.NumericFloat
-import com.intel.analytics.bigdl.utils.LoggerFilter
-import com.intel.analytics.bigdl.models.utils.ModelBroadcast
 import com.intel.analytics.zoo.pipeline.nnframes._
 import com.intel.analytics.zoo.common.NNContext
-import com.intel.analytics.zoo.feature.image.{ImageMatToTensor, ImageSet, _}
-import com.intel.analytics.bigdl.transform.vision.image.{ImageFeature, MatToFloats}
-import com.intel.analytics.zoo.models.image.imageclassification.{ImageClassifier, LabelOutput, _}
-import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Deserializers._
-import com.intel.analytics.bigdl.tensor.Tensor
+import com.intel.analytics.zoo.feature.image.{ImageSet, _}
+import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
+import com.intel.analytics.zoo.models.image.imageclassification._
 import com.intel.analytics.zoo.pipeline.inference.FloatInferenceModel
 
-import org.apache.spark.streaming.dstream.InputDStream
-import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
-import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
-import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
-import org.apache.spark.streaming.kafka010.{CanCommitOffsets, HasOffsetRanges, KafkaUtils}
-import org.apache.spark.streaming.{Seconds, StreamingContext}
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types.StructField
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.Duration
-import org.apache.spark.streaming.dstream.SocketInputDStream
+import org.apache.spark.SparkConf
 
-//import org.apache.spark.streaming
-import scala.util.Properties
 import java.util.Properties
 import java.io.FileInputStream
 
-import org.apache.spark.storage.StorageLevel
-import org.apache.spark.api.java.function.Function
-import org.apache.spark.api.java.function.MapFunction;
-import org.apache.spark.api.java.function.MapGroupsWithStateFunction;
-import org.apache.spark.util.NextIterator
-import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
-
-import org.apache.commons.io.FileUtils
-
-import java.io.InputStream
-import java.io.File
-import java.io.DataInputStream
-import java.io.ByteArrayInputStream
-import java.io.BufferedInputStream
-import java.io.PrintWriter
-import java.io.StringWriter
-
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-
-import java.awt.image.BufferedImage
-
-import java.util.UUID
-
 import scopt.OptionParser
-
-import scala.tools.jline_embedded.internal.InputStreamReader
-import scala.reflect.io.Streamable.Bytes
 
 import org.apache.log4j.{Level, Logger}
 
-import org.opencv.core.{CvType, Mat}
-import org.opencv.imgcodecs.Imgcodecs
-import org.apache.spark.SparkConf
-import java.security.Key
-import org.apache.spark.sql.Encoders
-import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.CustomObject.JSonImage
-import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Utils._
-import org.apache.spark.sql.Dataset
-import org.opencv.core.{CvType, Mat}
-import com.intel.analytics.bigdl.transform.vision.image.opencv.OpenCVMat
-import org.opencv.imgcodecs.Imgcodecs
-
 import java.util.Base64
-import java.beans.Encoder
 
 
 class ImageStructuredConsumer(prop: Properties) extends Serializable {
@@ -108,16 +47,6 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
                   .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
                   .set("spark.speculation", prop.getProperty("spark.speculation"))
                   .setAppName(prop.getProperty("spark.app.name"))
-                  
-    /*val kafkaConf = Map[String, Object](
-      ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> prop.getProperty("bootstrap.servers"),
-      ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
-      ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG -> classOf[StringDeserializer],
-      ConsumerConfig.MAX_POLL_RECORDS_CONFIG -> prop.getProperty("max.poll.records"),
-      ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> prop.getProperty("enable.auto.commit.config"),
-      ConsumerConfig.AUTO_OFFSET_RESET_CONFIG -> prop.getProperty("auto.offset.reset"),
-      ConsumerConfig.GROUP_ID_CONFIG ->  prop.getProperty("group.id")
-    )*/
     
     //SparkSesion
     sc = NNContext.initNNContext(conf)
@@ -135,10 +64,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
               ImageBytesToMat(imageCodec = 1) -> 
               imageConfig.preProcessor ->
               ImageFeatureToTensor()
-    
-    /*val transformer = BufferedImageResize(256, 256) ->
-        ImageBytesToMat(imageCodec = 1) -> ImageCenterCrop(224, 224) ->
-        ImageChannelNormalize(123, 117, 104) -> ImageMatToTensor() -> ImageFeatureToTensor()*/
+
     val featureTransformersBC = sc.broadcast(transformer)
         
     val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
