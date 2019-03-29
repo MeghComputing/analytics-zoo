@@ -1,16 +1,14 @@
 package com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Producers
 
-import java.io.{ByteArrayOutputStream, File}
+import java.io.File
+
+
 
 import java.util.UUID
 import java.util.Base64
 import java.util.Properties
 
 import util.control.Breaks._
-
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 
 
 import org.apache.commons.io.FileUtils
@@ -19,15 +17,10 @@ import scopt.OptionParser
 
 import scala.actors.threadpool.ExecutionException
 
-import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
-
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.clients.producer.ProducerConfig
-import org.opencv.core.{CvType, Mat}
-
 
 import org.apache.kafka.common.serialization.StringSerializer
-import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Serializers._
 
 import com.google.gson.JsonObject
 import com.google.gson.Gson

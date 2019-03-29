@@ -1,14 +1,10 @@
 package com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Producers
 
-import java.io.{ByteArrayOutputStream, File}
+import java.io.File
 
 import java.util.UUID
 
 import util.control.Breaks._
-
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 
 import org.apache.commons.io.FileUtils
 
@@ -20,10 +16,7 @@ import scala.actors.threadpool.ExecutionException
 
 import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
 
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
-
-import org.apache.kafka.common.serialization.StringSerializer
-import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Serializers._
+import org.apache.kafka.clients.producer.ProducerRecord
 
 object ImageProducer {
 
