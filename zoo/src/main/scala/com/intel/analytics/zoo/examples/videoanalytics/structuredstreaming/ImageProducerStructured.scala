@@ -1,3 +1,20 @@
+/*
+* Copyright 2018 Analytics Zoo Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
 package com.intel.analytics.zoo.examples.videoanalytics.structuredstreaming
 
 import java.io.FileInputStream
@@ -12,12 +29,19 @@ import org.opencv.videoio.{VideoCapture, Videoio}
 import org.slf4j.{Logger, LoggerFactory}
 import scopt.OptionParser
 
+/**
+  * [[ImageProducerStructured]] Image producer object for parsing command line arguments and
+  * calling video to image function for extracting image frames
+  * from input video and ingesting it into kafka topic.
+  */
+
 object ImageProducerStructured {
 
   case class ImageProducerParams(file: String = "", inputVideo: String = "")
 
-  val parser:OptionParser[ImageProducerParams] = new OptionParser[ImageProducerParams]("Image Producer") {
-    head("Image producer with Kafka and OpenCV")
+  val parser: OptionParser[ImageProducerParams] = new OptionParser[ImageProducerParams](
+    "Image Producer") {
+    head("Image producer with OpenCV and Kafka")
     opt[String]("file")
       .text("properties file for kafka")
       .action((x, c) => c.copy(file = x))
@@ -36,7 +60,12 @@ object ImageProducerStructured {
   }
 }
 
-
+/**
+  * Sets the Kafka topic name and loads properties file in
+  * memory for intializing kafka producer.
+  * @param file properties file for kafka and spark
+  * @param input path to the input video
+  */
 class ImageProducerStructured(val file: String, val input: String) {
 
   val logger: Logger = LoggerFactory.getLogger(classOf[ImageProducerStructured])
@@ -56,7 +85,7 @@ class ImageProducerStructured(val file: String, val input: String) {
   } catch {
     case e: Exception => logger.info("Error while reading property file")
   }
-  val topicName:String = properties.getProperty("kafka.topic")
+  val topicName: String = properties.getProperty("kafka.topic")
 
   if (topicName == null) {
     throw new InvalidParameterException(MessageFormat.format("Missing value for kafka topic!"))
@@ -65,9 +94,14 @@ class ImageProducerStructured(val file: String, val input: String) {
   val producer = new KafkaProducer[String, String](properties)
 
 
+  /**
+    * Intializes the videocapture and starts capturing image frames
+    * in the form of Mat object, converts into json object and sends
+    * the data to kafka producer.
+    */
   def videoToImages() {
 
-    try{
+    try {
       val capture = new VideoCapture()
       capture.open(input)
 
@@ -78,41 +112,45 @@ class ImageProducerStructured(val file: String, val input: String) {
       var frame_number = capture.get(Videoio.CAP_PROP_POS_FRAMES).toInt
 
       val mat = new Mat()
-      val startTime = System.currentTimeMillis()
 
+//      start capturing image frames
       while (capture.read(mat)) {
         val imageName = "IMAGE_" + frame_number + ".jpg"
         val byteMat = new MatOfByte()
         Imgcodecs.imencode(".jpg", mat, byteMat)
         val imageBytes = byteMat.toArray
+//        convert the image byte array into string
         val data = Base64.getEncoder.encodeToString(imageBytes)
         var obj = new JsonObject()
         var gson = new Gson()
         obj.addProperty("origin", imageName)
         obj.addProperty("data", data)
-        sendData(obj,gson)
+        sendData(obj, gson)
         frame_number += 1
       }
 
-      val endTime = System.currentTimeMillis()
-      val totalTime = endTime - startTime
-      val timePerFrame = totalTime.toFloat / frame_number
-      logger.info("Total time " + totalTime)
-      logger.info("Time per single frame " + timePerFrame)
-      logger.info("Frame number " + frame_number)
       capture.release()
       mat.release()
       producer.close()
-    }catch {
+    } catch {
       case e: Exception => logger.info(e.toString)
         e.printStackTrace()
     }
   }
 
-  def sendData(obj:JsonObject,gson:Gson): Unit = {
+  /**
+    * sends image data in the form of json string
+    * to kafka topic.
+    *
+    * @param obj  JsonObject containing image data
+    * @param gson Gson for converting json object into string
+    */
+  def sendData(obj: JsonObject, gson: Gson): Unit = {
     try {
-    val record: ProducerRecord[String, String] = new ProducerRecord(topicName,UUID.randomUUID.toString, gson.toJson(obj))
-    producer.send(record)
+      val record: ProducerRecord[String, String] = new ProducerRecord(topicName,
+        UUID.randomUUID.toString,
+        gson.toJson(obj))
+      producer.send(record)
     } catch {
       case e: Exception => logger.info("Error in sending record")
         e.printStackTrace()
