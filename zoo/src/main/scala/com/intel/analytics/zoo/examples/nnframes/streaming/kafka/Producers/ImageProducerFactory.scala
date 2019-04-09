@@ -18,7 +18,6 @@ object ImageProducerFactory {
     prop.put(ProducerConfig.CLIENT_ID_CONFIG, clientId)
     prop.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[StringSerializer])
     prop.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, classOf[CustomObjectSerializer])
-    //prop.put("num.partitions", partitions.toString())
     
     return new KafkaProducer[String, ImageFeature](prop);
   }

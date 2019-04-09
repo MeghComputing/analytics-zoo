@@ -78,6 +78,8 @@ class ImageContinuousConsumer(prop: Properties) extends Serializable {
       .option("kafka.bootstrap.servers", prop.getProperty("bootstrap.servers"))
       .option("locationStrategy", "PreferBrokers")
       .option("subscribe", prop.getProperty("kafka.topic"))
+      .option("key.serializer", prop.getProperty("org.apache.kafka.common.serialization.StringSerializer"))
+      .option("value.serializer", prop.getProperty("org.apache.kafka.common.serialization.StringSerializer"))
       .option("kafka.max.poll.records", prop.getProperty("max.poll.records"))
       .load()
       .selectExpr("CAST(value AS STRING) as image")

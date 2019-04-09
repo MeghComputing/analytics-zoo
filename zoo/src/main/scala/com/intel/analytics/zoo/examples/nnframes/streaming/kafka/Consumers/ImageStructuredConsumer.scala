@@ -8,22 +8,20 @@ import com.intel.analytics.zoo.feature.image.{ImageSet, _}
 import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
 import com.intel.analytics.zoo.models.image.imageclassification._
 import com.intel.analytics.zoo.pipeline.inference.FloatInferenceModel
-
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types.StructField
 import org.apache.spark.SparkConf
-
 import java.util.Properties
 import java.io.FileInputStream
 
 import org.apache.spark.SparkContext
 import scopt.OptionParser
-
 import org.apache.log4j.{Level, Logger}
-
 import java.util.Base64
+
+import org.apache.spark.streaming.kafka010.KafkaUtils
 
 
 class ImageStructuredConsumer(prop: Properties) extends Serializable {
@@ -74,14 +72,15 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
     //Create DataSet from stream messages from kafka
     val streamData = SQLContext.getOrCreate(sc).sparkSession      
       .readStream     
-      .format("kafka")            
+      .format("kafka")
       .option("kafka.bootstrap.servers", prop.getProperty("bootstrap.servers"))
       .option("subscribe", prop.getProperty("kafka.topic"))
-      .option("kafka.max.poll.records", prop.getProperty("max.poll.records"))
       .load()
       .selectExpr("CAST(value AS STRING) as image")
       .select(from_json(col("image"),schema=schema).as("image"))
       .select("image.*")
+
+
      
     val predictImageUDF = udf ( (uri : String, data: Array[Byte]) => {
       try {
