@@ -535,11 +535,15 @@
                     <outputEncoding>UTF-8</outputEncoding>
                 </configuration>
                 <executions>
+<<<<<<< HEAD
                    <execution>
+=======
+                   <!-- <execution>
+>>>>>>> 579fbbf30b6d6a107ba21d6c55ae3166e3fed2eb
                         <goals>
                             <goal>check</goal>
                         </goals>
-                    </execution>
+                    </execution>-->
                 </executions>
             </plugin>
             <plugin>
