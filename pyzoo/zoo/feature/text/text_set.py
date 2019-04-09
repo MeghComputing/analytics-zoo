@@ -73,12 +73,53 @@ class TextSet(JavaValue):
 
     def get_word_index(self):
         """
-        Get the word index dictionary of the TextSet.
+        Get the word_index dictionary of the TextSet.
         If the TextSet hasn't been transformed from word to index, None will be returned.
 
         :return: Dictionary {word: id}
         """
         return callBigDlFunc(self.bigdl_type, "textSetGetWordIndex", self.value)
+
+    def save_word_index(self, path):
+        """
+        Save the word_index dictionary to text file, which can be used for future inference.
+        Each separate line will be "word id".
+
+        For LocalTextSet, save txt to a local file system.
+        For DistributedTextSet, save txt to a local or distributed file system (such as HDFS).
+
+        :param path: The path to the text file.
+        """
+        callBigDlFunc(self.bigdl_type, "textSetSaveWordIndex", self.value, path)
+
+    def load_word_index(self, path):
+        """
+        Load the word_index map which was saved after the training, so that this TextSet can
+        directly use this word_index during inference.
+        Each separate line should be "word id".
+
+        Note that after calling `load_word_index`, you do not need to specify any argument when
+        calling `word2idx` in the preprocessing pipeline as now you are using exactly the loaded
+        word_index for transformation.
+
+        For LocalTextSet, load txt from a local file system.
+        For DistributedTextSet, load txt from a local or distributed file system (such as HDFS).
+
+        :return: TextSet with the loaded word_index.
+        """
+        jvalue = callBigDlFunc(self.bigdl_type, "textSetLoadWordIndex", self.value, path)
+        return TextSet(jvalue=jvalue)
+
+    def set_word_index(self, vocab):
+        """
+        Assign a word_index dictionary for this TextSet to use during word2idx.
+        If you load the word_index from the saved file, you are recommended to use `load_word_index`
+        directly.
+
+        :return: TextSet with the word_index set.
+        """
+        jvalue = callBigDlFunc(self.bigdl_type, "textSetSetWordIndex", self.value, vocab)
+        return TextSet(jvalue=jvalue)
 
     def generate_word_index_map(self, remove_topN=0, max_words_num=-1,
                                 min_freq=1, existing_map=None):
@@ -180,25 +221,44 @@ class TextSet(JavaValue):
     def word2idx(self, remove_topN=0, max_words_num=-1, min_freq=1, existing_map=None):
         """
         Map word tokens to indices.
-        Result index will start from 1 and corresponds to the occurrence frequency of each word
-        sorted in descending order.
-        Need to tokenize first.
-        See WordIndexer for more details.
-        After word2idx, you can get the generated wordIndex dict by calling 'get_word_index()'.
+        Important: Take care that this method behaves a bit differently for training and inference.
+
+        ---------------------------------------Training--------------------------------------------
+        During the training, you need to generate a new word_index dictionary according to the texts
+        you are dealing with. Thus this method will first do the dictionary generation and then
+        convert words to indices based on the generated dictionary.
+
+        You can specify the following arguments which poses some constraints when generating
+        the dictionary.
+        In the result dictionary, index will start from 1 and corresponds to the occurrence
+        frequency of each word sorted in descending order.
+        After word2idx, you can get the generated word_index dictionary by calling 'get_word_index'.
+        Also, you can call `save_word_index` to save this word_index dictionary to be used in
+        future training.
 
         :param remove_topN: Non-negative int. Remove the topN words with highest frequencies
                             in the case where those are treated as stopwords.
                             Default is 0, namely remove nothing.
         :param max_words_num: Int. The maximum number of words to be taken into consideration.
                               Default is -1, namely all words will be considered.
+                              Otherwise, it should be a positive int.
         :param min_freq: Positive int. Only those words with frequency >= min_freq will be taken
                          into consideration.
                          Default is 1, namely all words that occur will be considered.
-        :param existing_map: Existing map of word index if any.
+        :param existing_map: Existing dictionary of word_index if any.
                              Default is None and in this case a new map with index starting
                              from 1 will be generated.
-                             If not None, then the generated map will preserve the word index in
+                             If not None, then the generated map will preserve the word_index in
                              existing_map and assign subsequent indices to new words.
+
+        ---------------------------------------Inference--------------------------------------------
+        During the inference, you are supposed to use exactly the same word_index dictionary in the
+        training stage instead of generating a new one.
+        Thus please be aware that you do not need to specify any of the above arguments.
+        You need to call `load_word_index` or `set_word_index` beforehand for dictionary loading.
+
+        Need to tokenize first.
+        See WordIndexer for more details.
 
         :return: TextSet after word2idx.
         """
@@ -237,23 +297,22 @@ class TextSet(JavaValue):
     @classmethod
     def read(cls, path, sc=None, min_partitions=1, bigdl_type="float"):
         """
-        Read text files as TextSet.
+        Read text files with labels from a directory.
+        The folder structure is expected to be the following:
+        path
+          |dir1 - text1, text2, ...
+          |dir2 - text1, text2, ...
+          |dir3 - text1, text2, ...
+        Under the target path, there ought to be N subdirectories (dir1 to dirN). Each
+        subdirectory represents a category and contains all texts that belong to such
+        category. Each category will be a given a label according to its position in the
+        ascending order sorted among all subdirectories.
+        All texts will be given a label according to the subdirectory where it is located.
+        Labels start from 0.
 
-        If sc is defined, read texts as DistributedTextSet from local file system or HDFS.
-        If sc is None, read texts as LocalTextSet from local file system.
-
-        :param path: String. Folder path to texts.
-               The folder structure is expected to be the following:
-                   path
-                     |dir1 - text1, text2, ...
-                     |dir2 - text1, text2, ...
-                     |dir3 - text1, text2, ...
-               Under the target path, there ought to be N subdirectories (dir1 to dirN). Each
-               subdirectory represents a category and contains all texts that belong to such
-               category. Each category will be a given a label according to its position in the
-               ascending order sorted among all subdirectories.
-               All texts will be given a label according to the subdirectory where it is located.
-               Labels start from 0.
+        :param path: The folder path to texts. Local or distributed file system (such as HDFS)
+                     are supported. If you want to read from a distributed file system, sc
+                     needs to be specified.
         :param sc: An instance of SparkContext.
                    If specified, texts will be read as a DistributedTextSet.
                    Default is None and in this case texts will be read as a LocalTextSet.
@@ -268,15 +327,14 @@ class TextSet(JavaValue):
     @classmethod
     def read_csv(cls, path, sc=None, min_partitions=1, bigdl_type="float"):
         """
-        Read texts from csv file.
+        Read texts with id from csv file.
         Each record is supposed to contain the following two fields in order:
         id(string) and text(string).
         Note that the csv file should be without header.
 
-        If sc is defined, read texts as DistributedTextSet from local file system or HDFS.
-        If sc is None, read texts as LocalTextSet from local file system.
-
-        :param path: The path to the csv file.
+        :param path: The path to the csv file. Local or distributed file system (such as HDFS)
+                     are supported. If you want to read from a distributed file system, sc
+                     needs to be specified.
         :param sc: An instance of SparkContext.
                    If specified, texts will be read as a DistributedTextSet.
                    Default is None and in this case texts will be read as a LocalTextSet.
@@ -291,7 +349,7 @@ class TextSet(JavaValue):
     @classmethod
     def read_parquet(cls, path, sc, bigdl_type="float"):
         """
-        Read texts from parquet file.
+        Read texts with id from parquet file.
         Schema should be the following:
         "id"(string) and "text"(string).
 
@@ -328,6 +386,10 @@ class TextSet(JavaValue):
         """
         if isinstance(relations, RDD):
             relations = relations.map(lambda x: x.to_tuple())
+        elif isinstance(relations, list):
+            relations = [relation.to_tuple() for relation in relations]
+        else:
+            raise TypeError("relations should be RDD or list of Relation")
         jvalue = callBigDlFunc(bigdl_type, "textSetFromRelationPairs", relations, corpus1, corpus2)
         return TextSet(jvalue=jvalue)
 
@@ -358,6 +420,10 @@ class TextSet(JavaValue):
         """
         if isinstance(relations, RDD):
             relations = relations.map(lambda x: x.to_tuple())
+        elif isinstance(relations, list):
+            relations = [relation.to_tuple() for relation in relations]
+        else:
+            raise TypeError("relations should be RDD or list of Relation")
         jvalue = callBigDlFunc(bigdl_type, "textSetFromRelationLists", relations, corpus1, corpus2)
         return TextSet(jvalue=jvalue)
 

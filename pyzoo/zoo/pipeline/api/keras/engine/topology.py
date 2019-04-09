@@ -37,7 +37,9 @@ class KerasNet(ZooKerasLayer):
         loss: Criterion to be used. One can alternatively pass in the corresponding string
               representation, such as 'mse'.
         metrics: List of validation methods to be used. Default is None if no validation is needed.
-                 One can alternatively use ['accuracy'].
+                 For convenience, string representations are supported: 'accuracy' (or 'acc'),
+                 'top5accuracy' (or 'top5acc'), 'mae', 'auc', 'treennaccuracy' and 'loss'.
+                 For example, you can either use [Accuracy()] or ['accuracy'].
         """
         if isinstance(optimizer, six.string_types):
             optimizer = to_bigdl_optim_method(optimizer)
@@ -47,7 +49,7 @@ class KerasNet(ZooKerasLayer):
             from zoo.pipeline.api.autograd import CustomLoss
             loss = CustomLoss(loss, self.get_output_shape()[1:])
         if metrics and all(isinstance(metric, six.string_types) for metric in metrics):
-            metrics = to_bigdl_metrics(metrics)
+            metrics = to_bigdl_metrics(metrics, loss)
         callBigDlFunc(self.bigdl_type, "zooCompile",
                       self.value,
                       optimizer,
@@ -71,6 +73,40 @@ class KerasNet(ZooKerasLayer):
                       self.value,
                       log_dir,
                       app_name)
+
+    def get_train_summary(self, tag=None):
+        """
+        Get the scalar from model train summary
+        Return 2-D array like object which could be converted
+        by nd.array()
+        # Arguments
+        tag: The string variable represents the scalar wanted
+        """
+        # exception handle
+        if tag != "Loss" and tag != "LearningRate" and tag != "Throughput":
+            raise TypeError('Only "Loss", "LearningRate", "Throughput"'
+                            + 'are supported in train summary')
+
+        return callBigDlFunc(self.bigdl_type, "zooGetScalarFromSummary",
+                             self.value, tag, "Train")
+
+    def get_validation_summary(self, tag=None):
+        """
+        Get the scalar from model validation summary
+        Return 2-D array like object which could be converted
+        by np.array()
+        # Arguments
+        tag: The string variable represents the scalar wanted
+        """
+        validation_set = set(('AUC', 'Accuracy', 'BinaryAccuracy', 'CategoricalAccuracy',
+                              'HitRatio', 'Loss', 'MAE', 'NDCG', 'SparseCategoricalAccuracy',
+                              'TFValidationMethod', 'Top1Accuracy',
+                              'Top5Accuracy', 'TreeNNAccuracy'))
+        if tag not in validation_set:
+            raise TypeError('Only subclasses of ValidationMethod are supported,'
+                            + 'which are ' + str(validation_set))
+        return callBigDlFunc(self.bigdl_type, "zooGetScalarFromSummary",
+                             self.value, tag, "Validation")
 
     def set_checkpoint(self, path, over_write=True):
         """
@@ -128,7 +164,8 @@ class KerasNet(ZooKerasLayer):
                       self.value)
         return self
 
-    def fit(self, x, y=None, batch_size=32, nb_epoch=10, validation_data=None, distributed=True):
+    def fit(self, x, y=None, batch_size=32, nb_epoch=10,
+            validation_split=0, validation_data=None, distributed=True):
         """
         Train a model for a fixed number of epochs on a DataSet.
 
@@ -143,11 +180,19 @@ class KerasNet(ZooKerasLayer):
         distributed: Boolean. Whether to train the model in distributed mode or local mode.
                      Default is True. In local mode, x and y must both be Numpy arrays.
         """
+
         if distributed:
             if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
-                training_data = to_sample_rdd(x, y)
                 if validation_data:
                     validation_data = to_sample_rdd(*validation_data)
+                elif validation_split != 0:
+                    if validation_split > 1 or validation_split < 0:
+                        raise TypeError("validation split must in range [0, 1]")
+                    split_index = int(len(x) * (1 - validation_split))
+                    validation_data = (x[split_index:], y[split_index:])
+                    x, y = x[:split_index], y[:split_index]
+                    validation_data = to_sample_rdd(*validation_data)
+                training_data = to_sample_rdd(x, y)
             elif (isinstance(x, RDD) or isinstance(x, ImageSet) or isinstance(x, TextSet))\
                     and not y:
                 training_data = x

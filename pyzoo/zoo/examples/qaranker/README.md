@@ -10,14 +10,14 @@ Follow the instructions [here](https://analytics-zoo.github.io/master/#PythonUse
 
 ## Data Preparation
 __QA Dataset:__
+- For convenience, you are __recommended to directly download__ our processed WikiQA dataset from [here](https://s3.amazonaws.com/analytics-zoo-data/WikiQAProcessed.zip) and unzip it.
 - [WikiQA](https://www.microsoft.com/en-us/download/details.aspx?id=52419) is a new publicly available set of question and sentence pairs.
-- Instead of using original WikiQA dataset format directly, we refer to [MatchZoo](https://github.com/NTMC-Community/MatchZoo) to process the raw data into corpus and relations.
+- Instead of using original WikiQA dataset format directly, we refer to [MatchZoo](https://github.com/NTMC-Community/MatchZoo) to process raw data into corpus and relations.
 Thus this example expects the following input files put under the same directory, which ought to applicable for general question answering tasks:
     - `question_corpus.csv`: Each record contains QuestionID and content separated by comma.
     - `answer_corpus.csv`: Each record contains AnswerID and content separated by comma.
     - `relation_train.csv` and `relation_valid.csv`: Question and answer correspondence for training and validation respectively. Each record contains QuestionID, AnswerID and label (0 or 1) separated by comma.
-- For convenience, you are __recommended to directly download__ our processed WikiQA dataset from [here](https://s3.amazonaws.com/analytics-zoo-data/WikiQAProcessed.zip) and unzip it.
-- Alternatively, you can follow similar steps listed in this [script](https://github.com/NTMC-Community/MatchZoo/blob/master/data/WikiQA/run_data.sh) to process raw WikiQA dataset if you wish.
+- If you wish, you can also follow similar steps listed in this [script](https://github.com/NTMC-Community/MatchZoo/blob/v1.0/data/WikiQA/run_data.sh) to process the raw WikiQA dataset.
 
 __Word Embeddings:__
 - We use [`glove.840B.300d.txt`](http://nlp.stanford.edu/data/glove.840B.300d.zip) in this example.
@@ -60,6 +60,7 @@ See [here](#options) for more configurable options for this example.
 ## Options
 * `--data_path` This option is __required__. The directory containing the corpus and relations.
 * `--embedding_file` This option is __required__. The file path to GloVe embeddings.
+* `--output_path` If specified, the trained model `knrm.model` and word dictionary file `word_index.txt` will be saved under this path. It can be either a local or distributed file system path.
 * `--question_length` The sequence length of each question. Default is 10.
 * `--answer_length` The sequence length of each answer. Default is 40.
 * `--partition_num` The number of partitions to cut the datasets into. Default is 4.
