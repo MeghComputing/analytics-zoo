@@ -237,6 +237,12 @@
             <scope>${spark-scope}</scope>
         </dependency>
         <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-sql_${scala.major.version}</artifactId>
+            <version>${spark.version}</version>
+            <scope>${spark-scope}</scope>
+        </dependency>
+        <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
             <version>${kafka.version}</version>
@@ -534,17 +540,13 @@
                     </outputFile>
                     <outputEncoding>UTF-8</outputEncoding>
                 </configuration>
-                <executions>
-<<<<<<< HEAD
-                   <execution>
-=======
-                   <!-- <execution>
->>>>>>> 579fbbf30b6d6a107ba21d6c55ae3166e3fed2eb
+               <!-- <executions>
+                    <execution>
                         <goals>
                             <goal>check</goal>
                         </goals>
-                    </execution>-->
-                </executions>
+                    </execution>
+                </executions>-->
             </plugin>
             <plugin>
                 <groupId>net.alchim31.maven</groupId>

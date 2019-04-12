@@ -7,7 +7,7 @@ import com.intel.analytics.zoo.common.NNContext
 import com.intel.analytics.zoo.feature.image.{ImageSet, _}
 import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
 import com.intel.analytics.zoo.models.image.imageclassification._
-import com.intel.analytics.zoo.pipeline.inference.FloatInferenceModel
+import com.intel.analytics.zoo.pipeline.inference.FloatModel
 
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -68,7 +68,7 @@ class ImageContinuousConsumer(prop: Properties) extends Serializable {
     val featureTransformersBC = sc.broadcast(transformer)
 
     val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
-    val inferModel = new FloatInferenceModel(model.evaluate())
+    val inferModel = new FloatModel(model.evaluate())
     val modelBroadCast = sc.broadcast(inferModel)
 
     //Create DataSet from stream messages from kafka
@@ -76,7 +76,6 @@ class ImageContinuousConsumer(prop: Properties) extends Serializable {
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", prop.getProperty("bootstrap.servers"))
-      .option("locationStrategy", "PreferBrokers")
       .option("subscribe", prop.getProperty("kafka.topic"))
       .option("key.serializer", prop.getProperty("org.apache.kafka.common.serialization.StringSerializer"))
       .option("value.serializer", prop.getProperty("org.apache.kafka.common.serialization.StringSerializer"))
@@ -101,7 +100,7 @@ class ImageContinuousConsumer(prop: Properties) extends Serializable {
         val imgSet = ImageSet.array(Array(imf))
         var inputTensor = featureSteps(imgSet.toLocal().array.iterator).next()
         inputTensor = inputTensor.reshape(Array(1) ++ inputTensor.size())
-        val prediction = inferModel.predict(inputTensor).toTensor[Float].squeeze().toArray()
+        val prediction = localModel.predict(inputTensor).toTensor[Float].squeeze().toArray()
         val predictClass = prediction.zipWithIndex.maxBy(_._1)._2
         logger.info(s"transform and inference takes: ${(System.nanoTime() - st) / 1e9} s.")
         predictClass

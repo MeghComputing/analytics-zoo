@@ -71,7 +71,7 @@ object ImageStructuredProducer {
     }
     
     parser.parse(args, KafkaProducerParam()).foreach { params =>
-      //while(true) { 
+      while(true) {
         var prop = new Properties()
         prop.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, params.brokers)
         prop.put(ProducerConfig.CLIENT_ID_CONFIG, params.clientId)
@@ -130,7 +130,7 @@ object ImageStructuredProducer {
         
         producer.close()
         
-      //}
+      }
     }    
   }  
 }
