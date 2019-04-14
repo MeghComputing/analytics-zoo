@@ -24,6 +24,8 @@ case class TabDelimitedSink(
       pw.println(row(0) + "\t" + row(1))
     })
 
+    pw.close()
+
   }
 }
 

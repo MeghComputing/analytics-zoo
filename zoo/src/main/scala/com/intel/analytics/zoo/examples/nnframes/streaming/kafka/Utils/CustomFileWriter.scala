@@ -6,13 +6,13 @@ import org.apache.spark.sql.{ForeachWriter, Row}
 
 import scala.util.Properties
 
-class CustomWriter(filePath: String) extends ForeachWriter[Row]{
+class CustomFileWriter(filePath: String) extends ForeachWriter[Row]{
 
   var fw: FileWriter = _
 
   override def open(partitionId: Long, version: Long): Boolean = {
     println(s"Opened output file at location: ${filePath}")
-    fw = new FileWriter(filePath, true)
+    fw = new FileWriter(filePath)
     true
   }
 
@@ -29,3 +29,4 @@ class CustomWriter(filePath: String) extends ForeachWriter[Row]{
     fw.close()
   }
 }
+

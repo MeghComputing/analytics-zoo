@@ -1,17 +1,15 @@
 package com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Utils
 
-import java.io.{File, FileWriter, PrintWriter}
+import java.io.{File, PrintWriter}
 
 import org.apache.spark.sql.streaming.StreamingQueryListener
 
-import scala.util.Properties
-
 class StructuredQueryListener(filePath: String) extends StreamingQueryListener {
 
-  var fw: FileWriter = _
+  var fw: PrintWriter = _
 
   override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = {
-    fw = new FileWriter(filePath, true)
+    fw = new PrintWriter(new File(filePath))
 
     println(s"Opened output file at location: ${filePath}")
     println("Query started: " + event.id)
@@ -19,7 +17,7 @@ class StructuredQueryListener(filePath: String) extends StreamingQueryListener {
 
   override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
     println("Query progress: " + event.progress)
-    fw.write(event.progress.processedRowsPerSecond.toInt + Properties.lineSeparator )
+    fw.println(event.progress.processedRowsPerSecond.toInt)
     fw.flush()
   }
 

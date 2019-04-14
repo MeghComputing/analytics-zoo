@@ -22,7 +22,7 @@ import org.apache.log4j.{Level, Logger}
 import java.util.Base64
 
 import com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Utils._
-import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 
 
 class ImageStructuredConsumer(prop: Properties) extends Serializable {
@@ -126,29 +126,46 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
       }
     }: String)
 
-    val writer = new CustomWriter(prop.getProperty("classification.out.file"))
-    val queryMonitor = new StructuredQueryListener(prop.getProperty("fps.out.file"))
-
     val imageDF = streamData.withColumn("prediction", predictImageUDF(col("origin"), col("data")))
-
+    val queryMonitor = new StructuredQueryListener(prop.getProperty("fps.out.file"))
     SQLContext.getOrCreate(sc).sparkSession.streams.addListener(queryMonitor)
 
-    /*val query = imageDF
-      .selectExpr("origin", "prediction")
-      .writeStream
-      .outputMode("update")
-      .format("console")
-      .option("truncate", false)
-      .start()*/
+    var query: StreamingQuery = null
 
-    val query = imageDF
-      .selectExpr("origin", "prediction")
-      .writeStream
-      .outputMode("append")
-      .option("truncate", false)
-      .option("checkpointLocation", prop.getProperty("checkpoint.location"))
-      .foreach(writer)
-      .start()
+    prop.getProperty("sink.writer") match {
+      case "CustomFileWriter" =>
+        val writer = new CustomFileWriter(prop.getProperty("classification.out.file"))
+
+        query = imageDF
+          .selectExpr("origin", "prediction")
+          .writeStream
+          .outputMode("append")
+          .option("truncate", false)
+          .option("checkpointLocation", prop.getProperty("checkpoint.location"))
+          .foreach(writer)
+          .start()
+
+      case "CustomHDFSWriter" =>
+        val writer = new CustomHDFSWriter(prop.getProperty("classification.out.file"))
+
+        query = imageDF
+          .selectExpr("origin", "prediction")
+          .writeStream
+          .outputMode("append")
+          .option("truncate", false)
+          .option("checkpointLocation", prop.getProperty("checkpoint.location"))
+          .foreach(writer)
+          .start()
+
+      case "ConsoleWriter" =>
+        query = imageDF
+          .selectExpr("origin", "prediction")
+          .writeStream
+          .outputMode("update")
+          .format("console")
+          .option("truncate", false)
+          .start()
+    }
 
     query.awaitTermination()
     sc.stop()
