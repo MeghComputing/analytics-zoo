@@ -16,8 +16,6 @@
 
 package com.intel.analytics.zoo.feature.pmem
 
-import scala.collection.mutable.ArrayBuffer
-
 sealed trait MemoryType
 
 case object PMEM extends MemoryType
@@ -42,13 +40,6 @@ object MemoryType {
   }
 }
 
-object NativeArray {
-  private val natives = new ArrayBuffer[NativeArray[_]]()
-
-  def free(): Unit = {
-    NativeArray.natives.map{_.free()}
-  }
-}
 
 /**
  *
@@ -60,11 +51,7 @@ abstract class NativeArray[T](totalBytes: Long, memoryType: MemoryType) {
 
   val memoryAllocator = MemoryAllocator.getInstance(memoryType)
 
-  val startAddr: Long = NativeArray.synchronized {
-    val addr = memoryAllocator.allocate(totalBytes)
-    NativeArray.natives.append(this)
-    addr
-  }
+  val startAddr: Long = memoryAllocator.allocate(totalBytes)
 
   assert(startAddr > 0, s"Not enough memory to allocate: ${totalBytes} bytes!")
 
@@ -76,7 +63,7 @@ abstract class NativeArray[T](totalBytes: Long, memoryType: MemoryType) {
 
   def set(i: Int, value: T): Unit
 
-  def free(): Unit = NativeArray.synchronized {
+  def free(): Unit = {
     if (!deleted) {
       memoryAllocator.free(startAddr)
       deleted = true

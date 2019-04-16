@@ -73,7 +73,7 @@ def main(max_epoch, data_num):
     optimizer.optimize(end_trigger=MaxEpoch(max_epoch))
 
     saver = tf.train.Saver()
-    saver.save(optimizer.sess, "/tmp/lenet/model")
+    saver.save(optimizer.sess, "/tmp/lenet/")
 
 if __name__ == '__main__':
 

@@ -97,7 +97,7 @@ class AnomalyDetector(ZooModel):
         if isinstance(loss, six.string_types):
             loss = to_bigdl_criterion(loss)
         if metrics and all(isinstance(metric, six.string_types) for metric in metrics):
-            metrics = to_bigdl_metrics(metrics, loss)
+            metrics = to_bigdl_metrics(metrics)
         callBigDlFunc(self.bigdl_type, "anomalyDetectorCompile",
                       self.value,
                       optimizer,
@@ -193,18 +193,7 @@ class AnomalyDetector(ZooModel):
 
     @staticmethod
     def _to_indexed_rdd(unrolled_rdd):
-        def row_to_feature(feature_str):
-            feature = [x.split("|") for x in feature_str.split(",")]
-            matrix = []
-            for i in range(0, len(feature)):
-                line = []
-                for j in range(0, len(feature[0])):
-                    line.append(float(feature[i][j]))
-            matrix.append(line)
-            return matrix
-
-        return unrolled_rdd\
-            .map(lambda y: FeatureLableIndex(row_to_feature(y[0]), float(y[1]), long(y[2])))
+        return unrolled_rdd.map(lambda y: FeatureLableIndex(y[0], y[1], long(y[2])))
 
 
 class FeatureLableIndex(object):

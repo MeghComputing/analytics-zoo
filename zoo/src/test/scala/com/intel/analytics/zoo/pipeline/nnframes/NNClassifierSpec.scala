@@ -56,9 +56,8 @@ class NNClassifierSpec extends FlatSpec with Matchers with BeforeAndAfter {
     sqlContext = new SQLContext(sc)
     smallData = NNEstimatorSpec.generateTestInput(
       nRecords, Array(1.0, 2.0, 3.0, 4.0, 5.0, 6.0), -1.0, 42L)
-    val seed = System.currentTimeMillis()
-    Random.setSeed(seed)
-    RNG.setSeed(seed)
+    Random.setSeed(42)
+    RNG.setSeed(42)
     Engine.init
   }
 

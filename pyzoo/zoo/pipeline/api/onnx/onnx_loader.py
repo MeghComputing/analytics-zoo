@@ -40,11 +40,9 @@ class OnnxLoader(object):
         self._inputs = OrderedDict()  # the original input tensor only.
 
     @classmethod
-    def from_path(cls, onnx_path, is_training=False):
+    def from_path(cls, onnx_path):
         onnx_model = onnx.load(onnx_path)
-        zmodel = OnnxLoader(onnx_model.graph).to_keras()
-        zmodel.training(is_training=is_training)
-        return zmodel
+        return cls(onnx_model.graph)
 
     @staticmethod
     # inputs_dict is a list of batch data

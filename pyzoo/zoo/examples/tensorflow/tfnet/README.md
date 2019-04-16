@@ -23,16 +23,16 @@ python predict.py --image path_to_image_folder --model path_to_tensorflow_graph
 
 __Options:__
 * `--image` The path where the images are stored. It can be either a folder or an image path. Local file system, HDFS and Amazon S3 are supported.
-* `--model` The path to the TensorFlow object detection model. Local file system, HDFS and Amazon S3 are supported.
+* `--model` The path of the TensorFlow object detection model. Local file system, HDFS and Amazon S3 are supported.
 * `--partition_num` The number of partitions to cut the dataset into. Default is 4.
 
 ## Run this example with prebuilt package
 ```bash
-export SPARK_HOME=the root directory of Spark
-export ANALYTICS_ZOO_HOME=the directory where you extract the downloaded Analytics Zoo zip package
+ANALYTICS_ZOO_HOME=... # the directory where you extract the downloaded Analytics Zoo zip package
+SPARK_HOME=... #the root directory of Spark
 MASTER=... # Spark Master
-${ANALYTICS_ZOO_HOME}/bin/spark-submit-with-zoo.sh \
-    --master ${MASTER} \
+sh $ANALYTICS_ZOO_HOME/bin/spark-submit-with-zoo.sh \
+    --master $MASTER \
     predict.py \
     --image path_to_image_folder \
     --model path_to_tensorflow_graph
@@ -40,7 +40,7 @@ ${ANALYTICS_ZOO_HOME}/bin/spark-submit-with-zoo.sh \
 
 __Options:__
 * `--image` The path where the images are stored. It can be either a folder or an image path. Local file system, HDFS and Amazon S3 are supported.
-* `--model` The path of the TensorFlow object detection model.
+* `--model` The path of the TensorFlow object detection model. Local file system, HDFS and Amazon S3 are supported.
 * `--partition_num` The number of partitions to cut the dataset into. Default is 4.
 
 ## Results

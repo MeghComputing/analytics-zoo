@@ -38,10 +38,8 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
     val gradOutput2 = Tensor[Float](Array(batchSize, times, channels)).randn()
     val bnorm1 = BatchNormalization[Float](channels)
     val bnorm2 = BatchNormalization[Float](channels)
-    val model1 = InternalTimeDistributed[Float](bnorm1
-      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]])
-    val model2 = InternalTimeDistributed[Float](bnorm2
-      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]])
+    val model1 = InternalTimeDistributed[Float](bnorm1)
+    val model2 = InternalTimeDistributed[Float](bnorm2)
 
     model1.forward(input1)
     model1.backward(input1, gradOutput1)
@@ -66,8 +64,7 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
     val input = Tensor[Float](Array(batchSize, times, inputDim)).randn()
     val gradOutput = Tensor[Float](Array(batchSize, times, outputDim)).randn()
     val linear = Linear[Float](inputDim, outputDim)
-    val model = InternalTimeDistributed[Float](linear
-      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]])
+    val model = InternalTimeDistributed[Float](linear)
 
     val output = model.forward(input)
     val gradInput = model.backward(input, gradOutput)
@@ -95,11 +92,9 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
       b
     })
     val model1 = Sequential[Float]()
-      .add(InternalTimeDistributed[Float](linear1
-        .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]))
+      .add(InternalTimeDistributed[Float](linear1))
     val model2 = Sequential[Float]()
-      .add(InternalTimeDistributed[Float](linear2
-        .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]))
+      .add(InternalTimeDistributed[Float](linear2))
     val hashCode1 = model1.hashCode()
     val hashCode2 = model2.hashCode()
     hashCode1 should be(hashCode2)
@@ -115,8 +110,7 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
 
     val input = Tensor[Float](Array(batchSize, times, inputDim)).randn()
     val linear = Linear[Float](inputDim, outputDim)
-    val model = InternalTimeDistributed[Float](linear
-      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]])
+    val model = InternalTimeDistributed[Float](linear)
 
     model.getParametersTable() should be(linear.getParametersTable())
   }
@@ -142,8 +136,7 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
       b
     })
     val model = Sequential[Float]()
-      .add(InternalTimeDistributed[Float](linear1
-        .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]))
+      .add(InternalTimeDistributed[Float](linear1))
 
     val output = model.forward(input).toTensor[Float].clone
     var i = 1
@@ -184,8 +177,7 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
       b
     })
     val model = Sequential[Float]()
-      .add(InternalTimeDistributed[Float](linear1
-        .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]))
+      .add(InternalTimeDistributed[Float](linear1))
 
     val output = model.forward(input).toTensor[Float].clone
     var i = 1
@@ -221,8 +213,7 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
     val logSoftMax1 = LogSoftMax[Float]()
     val logSoftMax2 = LogSoftMax[Float]()
     val model = Sequential[Float]()
-      .add(InternalTimeDistributed[Float](logSoftMax1
-        .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]))
+      .add(InternalTimeDistributed[Float](logSoftMax1))
 
     val output = model.forward(input).toTensor[Float].clone
     val gradInput = model.backward(input, gradOutput).toTensor[Float].clone
@@ -256,8 +247,7 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
       b
     })
     val model = Sequential[Float]()
-      .add(InternalTimeDistributed[Float](linear1
-        .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]))
+      .add(InternalTimeDistributed[Float](linear1))
 
     val (weight, grad) = model.parameters()
     val (weight2, grad2) = linear2.parameters()
@@ -268,8 +258,7 @@ class InternalTimeDistributedSpec extends FlatSpec with Matchers {
 
 class InternalTimeDistributedSerialTest extends ModuleSerializationTest {
   override def test(): Unit = {
-    val InternalTimeDistributed = new InternalTimeDistributed[Float](Linear[Float](5, 5)
-      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]).
+    val InternalTimeDistributed = new InternalTimeDistributed[Float](Linear[Float](5, 5)).
       setName("InternalTimeDistributed")
     val input = Tensor[Float](2, 5, 5).apply1(_ => Random.nextFloat())
     runSerializationTest(

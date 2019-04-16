@@ -46,7 +46,6 @@ def getOrCreateSparkContext(conf=None, appName=None):
     :param conf: combining bigdl configs into spark conf
     :return: SparkContext
     """
-
     with SparkContext._lock:
         if SparkContext._active_spark_context is None:
             spark_conf = init_spark_conf() if conf is None else conf

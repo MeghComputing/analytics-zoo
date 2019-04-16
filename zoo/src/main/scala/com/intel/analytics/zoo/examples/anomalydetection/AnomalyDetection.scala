@@ -79,10 +79,8 @@ object AnomalyDetection {
 
     val model: AnomalyDetector[Float] = AnomalyDetector[Float](featureShape)
     model.compile(optimizer = new RMSprop(learningRate = 0.001, decayRate = 0.9),
-      loss = MeanSquaredError[Float](),
-      metrics = List( new MAE[Float]()))
-    model.fit(trainRdd, batchSize = param.batchSize, nbEpoch = param.nEpochs,
-      validationData = testRdd)
+      loss = MeanSquaredError[Float]())
+    model.fit(trainRdd, batchSize = param.batchSize, nbEpoch = param.nEpochs)
     val predictions = model.predict(testRdd)
 
     val yPredict: RDD[Float] = predictions.map(x => x.toTensor.toArray()(0))

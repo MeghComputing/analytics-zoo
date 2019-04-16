@@ -49,27 +49,11 @@ public abstract class AbstractInferenceModel extends InferenceModel implements S
   }
 
   public void loadTF(String modelPath) {
-    doLoadTF(modelPath);
+    doLoadTF(modelPath, 1, 1, true);
   }
 
   public void loadTF(String modelPath, int intraOpParallelismThreads, int interOpParallelismThreads, boolean usePerSessionThreads) {
     doLoadTF(modelPath, intraOpParallelismThreads, interOpParallelismThreads, usePerSessionThreads);
-  }
-
-  public void loadTF(String modelPath, String modelType) {
-    doLoadTF(modelPath, modelType);
-  }
-
-  public void loadTF(String modelPath, String pipelineConfigFilePath, String extensionsConfigFilePath) {
-    doLoadTF(modelPath, pipelineConfigFilePath, extensionsConfigFilePath);
-  }
-
-  public void loadTF(String modelPath, String modelType, String pipelineConfigFilePath, String extensionsConfigFilePath) {
-    doLoadTF(modelPath, modelType, pipelineConfigFilePath, extensionsConfigFilePath);
-  }
-
-  public void loadOpenVINO(String modelFilePath, String weightFilePath) {
-    doLoadOpenVINO(modelFilePath, weightFilePath);
   }
 
   public void reload(String modelPath) {
@@ -95,10 +79,5 @@ public abstract class AbstractInferenceModel extends InferenceModel implements S
 
   public List<List<JTensor>> predict(List<JTensor>[] inputs) {
     return predict(Arrays.asList(inputs));
-  }
-
-  @Override
-  public String toString() {
-    return super.toString();
   }
 }

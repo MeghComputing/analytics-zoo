@@ -18,7 +18,6 @@ package com.intel.analytics.zoo.models.image.objectdetection
 
 import com.intel.analytics.bigdl.dataset.PaddingParam
 import com.intel.analytics.bigdl.numeric.NumericFloat
-import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
 import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
 import com.intel.analytics.zoo.feature.common.Preprocessing
@@ -166,11 +165,5 @@ object ObjectDetectorDataset {
 case class ImInfo() extends ImageProcessing {
   override def transformMat(feature: ImageFeature): Unit = {
     feature("ImInfo") = feature.getImInfo()
-  }
-}
-
-case class DummyGT() extends ImageProcessing {
-  override def transformMat(feature: ImageFeature): Unit = {
-    feature("DummyGT") = Tensor[Float](1)
   }
 }

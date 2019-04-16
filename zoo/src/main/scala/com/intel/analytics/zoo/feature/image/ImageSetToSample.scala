@@ -30,13 +30,9 @@ class ImageSetToSample[T: ClassTag](inputKeys: Array[String] = Array(ImageFeatur
                        targetKeys: Array[String] = null,
                        sampleKey: String = ImageFeature.sample)(implicit ev: TensorNumeric[T])
   extends ImageProcessing {
-  private val internalTransformer = ImageFrameToSample[T](inputKeys, targetKeys, sampleKey)
+  private val internalCrop = ImageFrameToSample[T](inputKeys, targetKeys, sampleKey)
   override def apply(prev: Iterator[ImageFeature]): Iterator[ImageFeature] = {
-    prev.map(transform(_))
-  }
-
-  override def transform(feature: ImageFeature): ImageFeature = {
-    internalTransformer.transform(feature)
+    internalCrop.apply(prev)
   }
 }
 
