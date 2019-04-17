@@ -48,14 +48,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
       .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
       .set("spark.speculation", prop.getProperty("spark.speculation"))
       .setAppName(prop.getProperty("spark.app.name"))
-
-    /*val conf = new SparkConf()
-      .set("spark.shuffle.reduceLocality.enabled", prop.getProperty("spark.shuffle.reduceLocality.enabled"))
-      .set("spark.shuffle.blockTransferService", prop.getProperty("spark.shuffle.blockTransferService"))
-      .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
-      .set("spark.speculation", prop.getProperty("spark.speculation"))
-      .setAppName(prop.getProperty("spark.app.name"))
-    //SparkSesion*/
+    
     sc = NNContext.initNNContext(conf)
     //create schema for json message
     val schema = StructType(Seq(
@@ -130,19 +123,8 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
 
     var query: StreamingQuery = null
 
-
     prop.getProperty("sink.writer") match {
       case "CustomFileWriter" =>
-        val writer = new CustomFileWriter(prop.getProperty("classification.out.file"))
-
-        /*query = imageDF
-          .selectExpr("origin", "prediction")
-          .writeStream
-          .outputMode("update")
-          .option("truncate", false)
-          .option("checkpointLocation", prop.getProperty("checkpoint.location"))
-          .foreach(writer)
-          .start()*/
 
         query = imageDF
           .selectExpr("concat(origin, '\t', prediction) as results")
@@ -150,25 +132,17 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
           .outputMode("update")
           .option("truncate", false)
           .option("checkpointLocation", prop.getProperty("checkpoint.location"))
-          .foreachBatch((ds, i) => {
+          .foreachBatch((batchDS, batchId) => {
             logger.info(s"Start file sink for batch#: ${i}")
             val fos = new FileOutputStream(new File(prop.getProperty("classification.out.file")), true)
-            //val pw = new PrintWriter(fos)
             Console.withOut(fos){
               try {
-                //logger.info(s"Batch size#: ${ds.count()}")
-                //pw.println(s"Batch size#: ${ds.count()}")
-                //ds.repartition(1).rdd.foreach(row => println(row(0) + "\t" + row(1)))
-                //ds.repartition(1).show(ds.count().toInt, false)
-                val resultsList = ds.repartition(1).as(Encoders.STRING).collectAsList()
-                //Console.println(resultsList)
-
+                val resultsList = batchDS.repartition(1).as(Encoders.STRING).collectAsList()
                 resultsList.toArray.foreach(s => Console.println(s))
-
               }
               catch {
                 case e: Exception =>
-                  logger.info("Unexplained error!")
+                  logger.info(s"Unexplained error! in batch#${batchId}")
                   logger.error(e.getMessage())
               }
               finally {
