@@ -19,7 +19,7 @@ class StructuredQueryListener(filePath: String) extends StreamingQueryListener {
   }
 
   override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
-    logger.info("Query progress: " + event.progress)
+    //logger.info("Query progress: " + event.progress)
     fw.println(event.progress.processedRowsPerSecond.toInt)
     fw.flush()
   }

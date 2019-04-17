@@ -120,7 +120,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
           logger.error(e)
           e.printStackTrace()
           //println(e)
-          "-1"
+          "not found"
       }
     }: String)
 
@@ -145,7 +145,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
           .start()*/
 
         query = imageDF
-          .selectExpr("origin", "prediction")
+          .selectExpr("concat(origin, '\t', prediction) as results")
           .writeStream
           .outputMode("update")
           .option("truncate", false)
@@ -159,7 +159,12 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
                 //logger.info(s"Batch size#: ${ds.count()}")
                 //pw.println(s"Batch size#: ${ds.count()}")
                 //ds.repartition(1).rdd.foreach(row => println(row(0) + "\t" + row(1)))
-                ds.repartition(1).show(ds.count().toInt)
+                //ds.repartition(1).show(ds.count().toInt, false)
+                val resultsList = ds.repartition(1).as(Encoders.STRING).collectAsList()
+                //Console.println(resultsList)
+
+                resultsList.toArray.foreach(s => Console.println(s))
+
               }
               catch {
                 case e: Exception =>
