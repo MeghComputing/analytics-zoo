@@ -12,14 +12,14 @@ class CustomFileWriter(filePath: String) extends ForeachWriter[Row]{
 
   override def open(partitionId: Long, version: Long): Boolean = {
     println(s"Opened output file at location: ${filePath}")
-    fw = new FileWriter(filePath)
+    fw = new FileWriter(filePath,true)
     true
   }
 
   override def process(value: Row): Unit = {
 
     if(value != null){
-      fw.write(value(0) + "\t" + value(1) + Properties.lineSeparator )
+      fw.write(s"${value(0)} + \t + ${value(1)} + \n")
       fw.flush()
     }
   }
