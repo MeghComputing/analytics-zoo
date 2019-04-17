@@ -10,7 +10,7 @@ import com.intel.analytics.zoo.models.image.imageclassification._
 import com.intel.analytics.zoo.pipeline.inference.FloatModel
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{ForeachWriter, Row, SQLContext}
+import org.apache.spark.sql.{Encoders, ForeachWriter, Row, SQLContext, SaveMode}
 import org.apache.spark.sql.types.StructField
 import org.apache.spark.SparkConf
 import java.util.Properties
@@ -133,18 +133,16 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
 
     prop.getProperty("sink.writer") match {
       case "CustomFileWriter" =>
-        /*
-                val writer = new CustomFileWriter(prop.getProperty("classification.out.file"))
+        val writer = new CustomFileWriter(prop.getProperty("classification.out.file"))
 
-                query = imageDF
-                  .selectExpr("origin", "prediction")
-                  .writeStream
-                  .outputMode("update")
-                  .option("truncate", false)
-                  .option("checkpointLocation", prop.getProperty("checkpoint.location"))
-                  .foreach(writer)
-                  .start()
-        */
+        /*query = imageDF
+          .selectExpr("origin", "prediction")
+          .writeStream
+          .outputMode("update")
+          .option("truncate", false)
+          .option("checkpointLocation", prop.getProperty("checkpoint.location"))
+          .foreach(writer)
+          .start()*/
 
         query = imageDF
           .selectExpr("origin", "prediction")
@@ -154,24 +152,23 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
           .option("checkpointLocation", prop.getProperty("checkpoint.location"))
           .foreachBatch((ds, i) => {
             logger.info(s"Start file sink for batch#: ${i}")
-            @transient val fos = new FileOutputStream(new File(prop.getProperty("classification.out.file")), true)
-            @transient val pw: PrintWriter = new PrintWriter(fos)
-            //@transient val fw: FileWriter = new FileWriter(prop.getProperty("classification.out.file"), true)
-            try {
-              //logger.info(s"Batch size#: ${ds.count()}")
-              pw.println(s"Batch size#: ${ds.count()}")
-              /*ds.foreach(row => {
-                fw.write(s"${row(0)}\n")
-              })*/
-            }
-            catch {
-              case e: Exception =>
-                logger.info("Unexplained error!")
-                logger.error(e.getMessage())
-            }
-            finally {
-              pw.close()
-              logger.info(s"End file sink for batch#: ${i}")
+            val fos = new FileOutputStream(new File(prop.getProperty("classification.out.file")), true)
+            //val pw = new PrintWriter(fos)
+            Console.withOut(fos){
+              try {
+                //logger.info(s"Batch size#: ${ds.count()}")
+                //pw.println(s"Batch size#: ${ds.count()}")
+                //ds.repartition(1).rdd.foreach(row => println(row(0) + "\t" + row(1)))
+                ds.repartition(1).show(ds.count().toInt)
+              }
+              catch {
+                case e: Exception =>
+                  logger.info("Unexplained error!")
+                  logger.error(e.getMessage())
+              }
+              finally {
+                logger.info(s"End file sink for batch#: ${i}")
+              }
             }
           })
           .start()
