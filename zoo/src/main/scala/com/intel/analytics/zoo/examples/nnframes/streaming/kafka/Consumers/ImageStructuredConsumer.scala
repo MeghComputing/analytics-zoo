@@ -47,8 +47,17 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
       .set("spark.shuffle.blockTransferService", prop.getProperty("spark.shuffle.blockTransferService"))
       .set("spark.scheduler.minRegisteredResourcesRatio", prop.getProperty("spark.scheduler.minRegisteredResourcesRatio"))
       .set("spark.speculation", prop.getProperty("spark.speculation"))
-      .setAppName(prop.getProperty("spark.app.name"))
-    
+      .set("spark.serializer", prop.getProperty("spark.serializer"))
+      .set("spark.executor.extraJavaOptions", prop.getProperty("spark.executor.extraJavaOptions"))
+      .set("spark.driver.extraJavaOptions", prop.getProperty("spark.driver.extraJavaOptions"))
+      .set("spark.eventLog.enabled", prop.getProperty("spark.eventLog.enabled"))
+      .set("spark.eventLog.dir", prop.getProperty("spark.eventLog.dir"))
+      .set("spark.history.fs.logDirectory", prop.getProperty("spark.history.fs.logDirectory"))
+      .set("spark.executor.cores", prop.getProperty("spark.executor.cores"))
+      .set("spark.driver.maxResultSize", prop.getProperty("spark.driver.maxResultSize"))
+      .set("spark.shuffle.memoryFraction", prop.getProperty("spark.shuffle.memoryFraction"))
+      .set("spark.network.timeout", prop.getProperty("spark.network.timeout"))
+
     sc = NNContext.initNNContext(conf)
     //create schema for json message
     val schema = StructType(Seq(
@@ -118,13 +127,16 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
     }: String)
 
     val imageDF = streamData.withColumn("prediction", predictImageUDF(col("origin"), col("data")))
-    val queryMonitor = new StructuredQueryListener(prop.getProperty("fps.out.file"))
+    val queryMonitor = new StructuredQueryListener(prop.getProperty("fps.out.file"), prop.getProperty("multiplication.factor").toInt)
     SQLContext.getOrCreate(sc).sparkSession.streams.addListener(queryMonitor)
 
     var query: StreamingQuery = null
+    var fos: FileOutputStream = null
 
     prop.getProperty("sink.writer") match {
       case "CustomFileWriter" =>
+
+        fos = new FileOutputStream(new File(prop.getProperty("classification.out.file")), true)
 
         query = imageDF
           .selectExpr("concat(origin, '\t', prediction) as results")
@@ -133,11 +145,11 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
           .option("truncate", false)
           .option("checkpointLocation", prop.getProperty("checkpoint.location"))
           .foreachBatch((batchDS, batchId) => {
-            logger.info(s"Start file sink for batch#: ${i}")
-            val fos = new FileOutputStream(new File(prop.getProperty("classification.out.file")), true)
+            logger.info(s"Start file sink for batch#: ${batchId}")
+
             Console.withOut(fos){
               try {
-                val resultsList = batchDS.repartition(1).as(Encoders.STRING).collectAsList()
+                val resultsList = batchDS.as(Encoders.STRING).collectAsList()
                 resultsList.toArray.foreach(s => Console.println(s))
               }
               catch {
@@ -146,7 +158,8 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
                   logger.error(e.getMessage())
               }
               finally {
-                logger.info(s"End file sink for batch#: ${i}")
+                logger.info(s"End file sink for batch#: ${batchId}")
+                fos.flush()
               }
             }
           })
@@ -164,6 +177,7 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
 
     query.awaitTermination()
     sc.stop()
+    fos.close()
   }
 }
 

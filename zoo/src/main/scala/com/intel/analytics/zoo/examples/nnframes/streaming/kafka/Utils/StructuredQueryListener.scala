@@ -5,7 +5,7 @@ import java.io.{File, FileOutputStream, PrintWriter}
 import org.apache.log4j.Logger
 import org.apache.spark.sql.streaming.StreamingQueryListener
 
-class StructuredQueryListener(filePath: String) extends StreamingQueryListener {
+class StructuredQueryListener(filePath: String, multiplicationFactor: Int) extends StreamingQueryListener {
   @transient lazy val logger = Logger.getLogger("meghlogger")
   var fw: PrintWriter = _
 
@@ -20,7 +20,7 @@ class StructuredQueryListener(filePath: String) extends StreamingQueryListener {
 
   override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
     //logger.info("Query progress: " + event.progress)
-    fw.println(event.progress.processedRowsPerSecond.toInt)
+    fw.println(event.progress.processedRowsPerSecond.toInt * multiplicationFactor)
     fw.flush()
   }
 
