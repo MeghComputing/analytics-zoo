@@ -7,7 +7,7 @@ import com.intel.analytics.zoo.common.NNContext
 import com.intel.analytics.zoo.feature.image.{ImageSet, _}
 import com.intel.analytics.bigdl.transform.vision.image.ImageFeature
 import com.intel.analytics.zoo.models.image.imageclassification._
-import com.intel.analytics.zoo.pipeline.inference.FloatModel
+import com.intel.analytics.zoo.pipeline.inference.{FloatModel, InferenceModel}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Encoders, ForeachWriter, Row, SQLContext, SaveMode}
@@ -73,8 +73,10 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
       ImageFeatureToTensor()
     val featureTransformersBC = sc.broadcast(transformer)
 
-    val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
-    val inferModel = new FloatModel(model.evaluate())
+    //val model = Module.loadModule[Float](prop.getProperty("model.full.path"))
+    //val inferModel = new FloatModel(model.evaluate())
+    val inferModel = new InferenceModel(prop.getProperty("rdd.partition").toInt)
+    val model = inferModel.doLoad(prop.getProperty("model.full.path"))
     val modelBroadCast = sc.broadcast(inferModel)
     val labelBroadcast = sc.broadcast(LabelNames.labels)
 
@@ -108,7 +110,8 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
         val imgSet: ImageSet = ImageSet.array(Array(imf))
         var inputTensor = featureSteps(imgSet.toLocal().array.iterator).next()
         inputTensor = inputTensor.reshape(Array(1) ++ inputTensor.size())
-        val prediction = localModel.predict(inputTensor).toTensor[Float].squeeze().toArray()
+        //val prediction = localModel.predict(inputTensor).toTensor[Float].squeeze().toArray()
+        val prediction = localModel.doPredict(inputTensor).toTensor[Float].squeeze().toArray()
         val predictClass = prediction.zipWithIndex.maxBy(_._1)._2
 
         if(predictClass < 0 || predictClass > (labels.length - 1))
