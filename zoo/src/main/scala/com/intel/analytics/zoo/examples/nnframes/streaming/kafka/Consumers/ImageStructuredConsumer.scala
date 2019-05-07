@@ -57,6 +57,8 @@ class ImageStructuredConsumer(prop: Properties) extends Serializable {
       .set("spark.driver.maxResultSize", prop.getProperty("spark.driver.maxResultSize"))
       .set("spark.shuffle.memoryFraction", prop.getProperty("spark.shuffle.memoryFraction"))
       .set("spark.network.timeout", prop.getProperty("spark.network.timeout"))
+      .set("spark.app.name", prop.getProperty("spark.app.name"))
+        .set("spark.sql.streaming.metricsEnabled", "true")
 
     sc = NNContext.initNNContext(conf)
     //create schema for json message
