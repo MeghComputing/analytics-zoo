@@ -25,7 +25,7 @@ JARDIR=... // location of the built JAR
 CLIENTID=... // Kafka producer client id
 TOPIC=... // Kafka topic
 DELAY=... // delay between consecutive images sent
-NUMPARTITIONS=1 // The number of topic partitions is only dummy and does not really set the topic partitions. Please use the kafka quick start to understand how topics can be split into partitions 
+NUMPARTITIONS=1 // The number of topic partitions is only dummy and does not really set the topic partitions. Please use the kafka quick start to understand how topics can be split into partitions
 
 java -cp ${JARDIR}/analytics-zoo-bigdl_0.7.2-spark_2.3.1-0.4.0-SNAPSHOT-jar-with-dependencies-and-spark.jar com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Producers.ImageProducer --brokers ${BROKERLIST} --clientId ${CLIENTID} --imageFolder ${IMAGEDIR} --topic ${TOPIC} --txDelay ${DELAY} --numPartitions ${NUMPARTITIONS}
 ```
@@ -59,39 +59,51 @@ spark-submit \
 
 #### Run this to start kafka image producer
 ```shell
-IMAGEDIR=... // the folder in which images are stored
-BROKERLIST=... // BROKERIP:PORT
-JARDIR=... // location of the built JAR
-CLIENTID=... // Kafka producer client id
-TOPIC=... // Kafka topic
-DELAY=... // delay between consecutive images sent
-NUMPARTITIONS=1 // The number of topic partitions is only dummy and does not really set the topic partitions. Please use the kafka quick start to understand how topics can be split into partitions 
+#!/usr/bin/env bash
 
-java -cp ${JARDIR}/analytics-zoo-bigdl_0.7.2-spark_2.3.1-0.4.0-SNAPSHOT-jar-with-dependencies-and-spark.jar com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Producers.ImageStructuredProducer --brokers ${BROKERLIST} --clientId ${CLIENTID} --imageFolder ${IMAGEDIR} --topic ${TOPIC} --txDelay ${DELAY} --numPartitions ${NUMPARTITIONS}
-```
+#script to start the spark structured streaming app-cpu
+#Install folder
+INSTALLDIR=/scratch/pgargesa/SPARK_AI
+#jar file
+JARFILE=$INSTALLDIR/Jars/analytics-zoo-bigdl_0.7.2-spark_2.4.0-0.5.0-SNAPSHOT-jar-with-dependencies.jar
+#properties file
+PROPFILE=$INSTALLDIR/properties/streaming_cpu.properties
+#class name
+CLASSNAME=com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Consumers.ImageStructuredConsumer
 
-#### Run this example to start kafka structured streaming consumer
-Run the following command for Spark local mode (MASTER=local[*]) or cluster mode:
-```bash
-export PATH=$PATH:${SPARK_HOME}/bin 
+#SPARK CONFIGS
+#Spark driver IP
+SPARK_HOST=222.10.0.50
 
-LOGDIR=... // Directory where the log4j.properties files is maintained (sample log properties file in zoo/src/resources/)
-SPARK_HOME=... // the root directory of spark
-MASTER=... // local[*] or spark://host-ip:port
-JARDIR=... // location of the built JAR
-STREAMING_PROP=... // absolute path of the streaming properties files (sample properties file in zoo/src/resources/). Please change the paths and parameters in the streaming properties files before execution
+#Driver config
+#DRIVER=local[*]
+DRIVER=spark://$SPARK_HOST:7077
+
+#Memory Config
+DRIVERMEM=10G
+EXECUTORMEM=10G
+
+#TOTAL EXEC CORES
+TOTALCORES=8
+
+#Environment Config
+export SPARK_LOCAL_IP=$SPARK_HOST
+export SPARK_HOME=/home/pgargesa/PG_Workspace/Spark-Hadoop/spark-2.4.0-bin-hadoop2.7
+export PATH=$PATH:$SPARK_HOME/bin
+
 
 spark-submit \
---master ${MASTER} \
---driver-memory 8g \
---executor-memory 8g \
+--conf "spark.metrics.conf.*.sink.graphite.class"="org.apache.spark.metrics.sink.GraphiteSink" \
+--conf "spark.metrics.conf.*.sink.graphite.host"="222.10.0.50" \
+--conf "spark.metrics.conf.*.sink.graphite.port"=2005 \
+--conf "spark.metrics.conf.*.sink.graphite.period"=10 \
+--conf "spark.metrics.conf.*.sink.graphite.unit"=seconds \
+--conf "spark.metrics.conf.*.sink.graphite.prefix"="meghtest" \
+--conf "spark.metrics.conf.*.source.jvm.class"="org.apache.spark.metrics.source.JvmSource" \
+--master $DRIVER \
+--driver-memory $DRIVERMEM \
+--executor-memory $DRIVERMEM \
 --verbose \
---conf spark.executor.cores=4 \
---conf spark.driver.maxResultSize=10G \
---conf spark.shuffle.memoryFraction=0 \
---conf spark.network.timeout=10000000 \
---total-executor-cores 4 \
---driver-java-options "-Dlog4j.configuration=file:$LOGDIR/log4j.properties" \
---conf "spark.executor.extraJavaOptions=-Dlog4j.configuration=file:$LOGDIR/log4j.properties" \
---class com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Consumers.ImageStructuredConsumer ${JARDIR}/analytics-zoo-bigdl_0.7.2-spark_2.3.1-0.4.0-SNAPSHOT-jar-with-dependencies-and-spark.jar --propFile ${STREAMING_PROP}
+--total-executor-cores $TOTALCORES \
+--class $CLASSNAME $JARFILE --propFile $PROPFILE
 ```
