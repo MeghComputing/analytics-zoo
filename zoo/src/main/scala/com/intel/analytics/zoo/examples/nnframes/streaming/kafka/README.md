@@ -59,6 +59,21 @@ spark-submit \
 
 #### Run this to start kafka image producer
 ```shell
+#Install folder
+INSTALLDIR=/scratch/pgargesa/SPARK_AI
+#jar file
+JARFILE=$INSTALLDIR/Jars/analytics-zoo-bigdl_0.7.2-spark_2.4.0-0.5.0-SNAPSHOT-jar-with-dependencies-and-spark.jar
+#properties file
+PROPFILE=$INSTALLDIR/properties/cpu-producer.properties
+#class name
+CLASSNAME=com.intel.analytics.zoo.examples.nnframes.streaming.kafka.Producers.ImageStructuredProducer
+
+java -cp $JARFILE $CLASSNAME --propFile $PROPFILE
+```
+
+#### Run this example to start kafka structured streaming consumer
+Run the following command for Spark local mode (MASTER=local[*]) or cluster mode:
+```bash
 #!/usr/bin/env bash
 
 #script to start the spark structured streaming app-cpu
